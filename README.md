@@ -98,7 +98,7 @@ To charge from excess solar, just plug in the charger.  The initial charge curre
 
 Option 2
 --------
-To charge from secondary power source and solar, toggle on charge from grid and set power offset to draw power from grid.
+To charge from secondary power source and solar, toggle on secondary power source and set power offset to draw power from grid.
 
 
 Notes
@@ -126,8 +126,8 @@ Special note for 3-phase chargers
 ---------------------------------
 Please see [discussion](https://github.com/flashg1/TeslaSolarCharger/issues/18) on voltage to set for charger with 3-phase power.
 
-Charge mutiple EV at the same time based on power allocation weighting for each car
------------------------------------------------------------------------------------
+Charge mutiple EVs at the same time based on power allocation weighting for each car
+------------------------------------------------------------------------------------
 Note: This is theoretical only since I don't have 2 EVs to test this, but happy for any feedback.  To ensure power is allocated according to weighting, the "Main power net" update cycle should be the same as the script looping cycle, ie. 1 minute.
 
 - Create power allocation weighting for each car.  For example, to create for car1,
