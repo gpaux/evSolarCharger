@@ -31,7 +31,7 @@ blueprint:
     sensor_main_power_net:
       name: Main power net
       description: >
-        Sensor that expresses negative value in Watts for available power or positive value for consumed power.
+        Sensor that expresses negative value in Watts for available power for charging car or positive value for consumed power.
         This sensor is the feedback loop for adjusting power consumption.
       default: sensor.main_power_net
       selector:
@@ -121,7 +121,7 @@ blueprint:
       name: Use Tesla API
       description: >
         Toggle on to use Tesla API to control Tesla car for charging.
-        Toggle off to use OCPP to control the charger to charge a EV. Charger must support OCPP v1.6 or higher.
+        Toggle off to use OCPP to control an OCPP compliant charger to charge a EV.
       default: false
       selector:
         boolean:
@@ -158,7 +158,7 @@ blueprint:
     # Car daily charge limit
     #####################################
     toggle_set_daily_car_charge_limit:
-      name: Set daily car charge limit toggle
+      name: Set daily car charge limit toggle (for Tesla car only)
       description: >
         Set car charge limit configured for the day once on start up (Settings > Devices & Services > Helpers > Create helper > Toggle).
         If toggled off, the existing car charge limit will be used.
@@ -247,7 +247,7 @@ blueprint:
     # Weather forecast
     #####################################
     charge_car_base_on_weather:
-      name: Adjust daily car charge limit based on weather
+      name: Adjust daily car charge limit based on weather (for Tesla car only)
       description: >
         Automatically adjust to the highest charge limit set within a rainy forecast period.
         Daily car charge limit and weather provider settings must be configured.

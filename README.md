@@ -36,7 +36,7 @@ Installation
 ```
 template:
 
-    # Sensor main_power_net expresses negative value in Watts for available power or positive value for consumed power.
+    # Sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
     # For other inverter brands, adjust the formula to conform with above requirement according to your setup.
     - sensor:
         name: Main Power Net
@@ -48,7 +48,7 @@ template:
             {{ states('sensor.envoy_[YourEnvoyId]_current_power_consumption')|int - states('sensor.envoy_[YourEnvoyId]_current_power_production')|int }}
 ```
 
-- If using OCPP charger, configure your charger to point the HA OCPP central server, eg. ws://homeassistant.local:9000
+- If using OCPP charger, configure your charger to point to the HA OCPP central server, eg. ws://homeassistant.local:9000
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fflashg1%2FevSolarCharger%2Fblob%2Fmain%2Fev_solar_charger_automation.yaml)
 
