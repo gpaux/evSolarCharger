@@ -1,0 +1,957 @@
+###############################################################################
+# Disclaimer:
+#
+# Even though this automation has been created with care, the author cannot be
+# responsible for any damages caused by this automation.  Use at your own risk.
+#
+###############################################################################
+# Objective:
+# - Use OCPP or Tesla API to charge EV from excess solar and weather forecast.
+#
+# History:
+# 20/6/2023 Inspiration from Alphaemef's Tesla Solar Charger Blueprint 30/4/2023.
+###############################################################################
+
+blueprint:
+
+  name: EV solar charger automation
+  description: >
+    Use OCPP or Tesla API to charge EV from excess solar and weather forecast (v3.0beta).
+    See https://github.com/flashg1/evSolarCharger for details.
+  domain: automation
+
+  #####################################
+  # Blueprint inputs
+  #####################################
+  input:
+
+    #####################################
+    # Main configs
+    #####################################
+    sensor_main_power_net:
+      name: Main power net
+      description: >
+        Sensor that expresses negative value in Watts for available power or positive value for consumed power.
+        This sensor is the feedback loop for adjusting power consumption.
+      default: sensor.main_power_net
+      selector:
+        entity:
+          domain: sensor
+
+    charger_voltage:
+      name: Charger voltage
+      description: >
+        Specify charger voltage in Volt.
+        In Australia, single phase is 230V, and three phase is 400V due to 120 degree phase angle between phases.
+        This can differ between countries.
+      default: 230
+      selector:
+        number:
+          min: 110
+          max: 750
+          unit_of_measurement: volt
+          mode: box
+
+    charger_max_current:
+      name: Charger maximum current
+      description: Specify charger maximum current in Ampere.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 100
+          unit_of_measurement: amp
+          mode: box
+
+    charger_min_current:
+      name: Charger minimum current
+      description: >
+        Specify the minimum charging current to keep charging the car when there is no excess solar electricity.
+        The default is 0 Ampere.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: amp
+          mode: box
+
+    wait_main_power_net_update:
+      name: Wait main power net update
+      description: >
+        Specify in seconds how often to check "sensor_main_power_net".
+        The waiting period should be equal to the sensor update interval.
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 600
+          unit_of_measurement: second
+          mode: box
+
+    sunrise_elevation_start_trigger:
+      name: Sunrise elevation start trigger
+      description: >
+        Specify elevation to start charging relative to sunrise.
+        Default is to start when sun is 6 degrees above horizon after sunrise.
+        See https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition for details.
+      default: 6
+      selector:
+        number:
+          min: -90
+          max: +90
+          unit_of_measurement: degree
+          mode: box
+
+    sunset_elevation_end_trigger:
+      name: Sunset elevation end trigger
+      description: >
+        Specify elevation to stop charging relative to sunset.
+        Default is to end when sun is 6 degrees above the horizon before sunset.
+        See https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition for details.
+      default: 6
+      selector:
+        number:
+          min: -90
+          max: +90
+          unit_of_measurement: degree
+          mode: box
+
+    use_Tesla_api:
+      name: Use Tesla API
+      description: >
+        Toggle on to use Tesla API to control Tesla car for charging.
+        Toggle off to use OCPP to control the charger to charge a EV. Charger must support OCPP v1.6 or higher.
+      default: false
+      selector:
+        boolean:
+
+    toggle_secondary_power_source:
+      name: Secondary power source toggle
+      description: >
+        Toggle on to charge from solar and secondary power source using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Default is to charge from solar only.
+      selector:
+        entity:
+          domain: input_boolean
+
+    power_offset_from_zero:
+      name: Power offset for import from or export to secondary power source
+      description: >
+        Sensor to specify offset in Watts for power flow to or from secondary power source, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
+        Set negative value to import from secondary power source, or positive value to export to secondary power source.
+        If secondary power source is toggled off, the script will try to achieve power offset of 0 watt, ie. 0 power to or from secondary power source.
+      #default: sensor.not_defined
+      selector:
+        entity:
+
+    toggle_stop_charger:
+      name: Stop charger toggle
+      description: >
+        Toggle on to stop charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Delayed by "Wait main power net update" value.
+      selector:
+        entity:
+          domain: input_boolean
+
+    #####################################
+    # Car daily charge limit
+    #####################################
+    toggle_set_daily_car_charge_limit:
+      name: Set daily car charge limit toggle
+      description: >
+        Set car charge limit configured for the day once on start up (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        If toggled off, the existing car charge limit will be used.
+      selector:
+        entity:
+          domain: input_boolean
+
+    car_charge_limit_monday:
+      name: Monday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_tuesday:
+      name: Tuesday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_wednesday:
+      name: Wednesday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_thursday:
+      name: Thursday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_friday:
+      name: Friday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 80
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_saturday:
+      name: Saturday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 80
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    car_charge_limit_sunday:
+      name: Sunday
+      description: "Car charge limit for day (valid range: 50 - 100)."
+      default: 80
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    #####################################
+    # Weather forecast
+    #####################################
+    charge_car_base_on_weather:
+      name: Adjust daily car charge limit based on weather
+      description: >
+        Automatically adjust to the highest charge limit set within a rainy forecast period.
+        Daily car charge limit and weather provider settings must be configured.
+      default: false
+      selector:
+        boolean:
+
+    weather_provider:
+      name: Weather provider
+      description: Weather forecast provider, eg. Meteorologisk institutt (Met.no).
+      default: weather.forecast_home
+      selector:
+        entity:
+          domain: weather
+
+    forecast_index:
+      name: Forecast days
+      description: Number of days to forecast weather excluding today.
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 6
+          mode: slider
+          unit_of_measurement: day
+
+    forecast_attribute:
+      name: Weather condition field name
+      description: >
+        Field name for forecast attribute (default="condition").
+        See https://www.home-assistant.io/integrations/weather/ for details.
+      default: "condition"
+      selector:
+        text:
+
+    car_charge_limit_on_bad_weather:
+      name: Car charge limit on bad weather forecast
+      description: >
+        Car charge limit to set on bad weather forecast (valid range: 50 - 100).
+        This will be used unless there is a higher setting within the forecast period.
+      default: 80
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: percent
+          mode: slider
+
+    #####################################
+    # Common config entities
+    #####################################
+    car_sensor_charger_pluggedin:
+      name: Charger plugged in sensor
+      description: >
+        Sensor to check if car is plugged in.
+        (OCPP: sensor.charger_status_connector)
+      default: binary_sensor.charger
+      selector:
+        entity:
+    #      domain: binary_sensor
+
+    car_switch_charger:
+      name: Charger on/off switch
+      description: >
+        Switch to turn charger on or off.
+        (OCPP: switch.charger_charge_control)
+      default: switch.charger
+      selector:
+        entity:
+          domain: switch
+
+    car_sensor_charging:
+      name: Charger charging sensor
+      description: >
+        Sensor to check if car is charging.
+        (OCPP: sensor.charger_status_connector)
+      default: binary_sensor.charging
+      selector:
+        entity:
+    #      domain: binary_sensor
+
+    car_number_charging_amps:
+      name: Charger current
+      description: >
+        Entity to control current in Ampere used to charge the car battery.
+        This is the main parameter used to adjust electricity consumption.
+        (OCPP: number.charger_maximum_current)
+      default: number.charging_amps
+      selector:
+        entity:
+          domain: number
+
+    car_sensor_battery:
+      name: EV battery state of charge sensor
+      description: >
+        Sensor that reports current battery charge level.
+        (OCPP: sensor.charger_soc)
+      default: sensor.battery
+      selector:
+        entity:
+          domain: sensor
+
+    #####################################
+    # Tesla config entities
+    #####################################
+    car_number_charge_limit:
+      name: Tesla charge limit
+      description: Entity to control car battery charge limit in percentage (100% = fully charged).
+      default: number.charge_limit
+      selector:
+        entity:
+          domain: number
+
+    car_location_tracker:
+      name: Tesla location tracker
+      description: >
+        The entity that provides the location of car.
+        Important that home location is defined in Home Assistant.
+      default: device_tracker.location_tracker
+      selector:
+        entity:
+          domain: device_tracker
+
+    car_button_wake_up:
+      name: Tesla button wake up
+      description: Button to wake up car.
+      default: button.wake_up
+      selector:
+        entity:
+          domain: button
+
+    car_button_forceupdate_ha:
+      name: Tesla button force update Home Assistant
+      description: Button to force update sensors in Home Assistant with values from car.
+      default: button.force_data_update
+      selector:
+        entity:
+          domain: button
+
+###############################################################################
+# Only one Blueprint can run at any one time
+###############################################################################
+mode: single
+
+###############################################################################
+# Global variables
+# https://community.home-assistant.io/t/why-the-heck-dont-we-have-global-variables/219671/86
+# https://github.com/rogro82/hass-variables
+###############################################################################
+variables:
+
+  #####################################
+  # Constants
+  #####################################
+  # Tesla UMC charger initial minimum charging current is 5A, after that it can vary between 0A and 15A.
+  # Tesla UMC charger initial minimum charging current is 6A.
+  initial_charge_current: 6
+  
+  # Time to wait in seconds for car to wake up.
+  wait_car_wakeup: 40
+
+  # Time to wait in seconds to turn charger on or off.
+  # To switch on charger from 2V to 230V and then ram up current, it took 16 seconds for initial_charge_current 15A.
+  #wait_charger_on: 16
+  # To switch on charger from 2V to 230V and then ram up current, it took 11 seconds for initial_charge_current 6A.
+  wait_charger_on: 11
+  wait_charger_off: 5
+
+  # Time to wait in seconds for current to change after sending command.
+  #wait_current_change: "00:00:0.3"
+  wait_current_change: 0.3
+
+  # Wait in seconds after setting car charge limit.
+  wait_charge_limit: 5
+  
+  # Time to wait in seconds for command to execute after sending command.
+  wait_command_execute: 5
+  #wait_command_execute_str: "00:00:{{ wait_command_execute }}"
+
+  # Skew_default defines the left and right skew of the power import/export curve. Skew should be kept between -1 and 0.
+  # It defines the 230W buffer range in which all_power_net can fluctuate without causing power adjustments.
+  # Skew  Power adjustment triggers     Comment
+  # ----------------------------------------------------------------
+  # -1    -230W > all_power_net >= 0W   Decrease power draw
+  # -0.3  -69W > all_power_net >= 161W  Allow fluctuation around 0W
+  # 0     0W > all_power_net >= 230W    Increase power draw
+  # +1    230W > all_power_net >= 460W  Increase power draw
+  skew_default: -0.3
+
+  # Valid charge limit range for Tesla API, otherwise will get following error,
+  # Error: Value 0.0 for number.charge_limit is outside valid range 50 - 100
+  car_charge_limit_min: 50
+  car_charge_limit_max: 100
+
+  #####################################
+  # Inputs
+  #####################################
+  # Local variables
+  # ---------------
+  # Must not use states() to access local variables
+  car_charger_voltage: !input charger_voltage
+  car_charger_max_current: !input charger_max_current
+  car_charger_min_current: !input charger_min_current
+  sunrise_elevation_start_trigger: !input sunrise_elevation_start_trigger
+  sunset_elevation_end_trigger: !input sunset_elevation_end_trigger
+
+  useTeslaApi: !input use_Tesla_api
+  chargeCarBaseOnWeather: !input charge_car_base_on_weather
+
+  # Power = Voltage * Current
+  # The power step in watts to increase or decrease with 1A current change.
+  one_amp_watt_step: "{{ car_charger_voltage * 1 }}"
+
+  # External entities
+  # -----------------
+  # Must use states() to access external entities
+  useSecondaryPowerSource: !input toggle_secondary_power_source
+  powerOffsetFromZero: !input power_offset_from_zero
+  stop_charger: !input toggle_stop_charger
+  setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
+
+  carChargeLimit: !input car_number_charge_limit
+  carBatteryLevel: !input car_sensor_battery
+
+  isCarCharging: !input car_sensor_charging
+  car_charging_amps: !input car_number_charging_amps
+  carLocationTracker: !input car_location_tracker
+
+  #####################################
+  # Set car charge limit based on which week day
+  #####################################
+  mon: !input car_charge_limit_monday
+  tue: !input car_charge_limit_tuesday
+  wed: !input car_charge_limit_wednesday
+  thu: !input car_charge_limit_thursday
+  fri: !input car_charge_limit_friday
+  sat: !input car_charge_limit_saturday
+  sun: !input car_charge_limit_sunday
+  
+  # Store as integer list
+  car_charge_limit_list: "{{ [mon, tue, wed, thu, fri, sat, sun] }}"
+  todayIndex: "{{ now().weekday() }}"
+
+  #####################################
+  # Set car charge limit based on weather forecast
+  #####################################
+  weather_provider: !input weather_provider
+  forecast_index: !input forecast_index
+  forecast_attribute: !input forecast_attribute
+  carChargeLimitOnBadWeather: !input car_charge_limit_on_bad_weather
+
+  # Not all intervals are available for all providers. Possible values: "hourly", "twice_daily", "daily"
+  forecast_interval: "daily"
+
+###############################################################################
+# Triggers
+# Note:
+# - Tesla triggers do not update often due to infrequent polling.
+###############################################################################
+triggers:
+
+  # Trigger action if just plugged in.
+  - platform: state
+    entity_id:
+      - !input car_sensor_charger_pluggedin
+    to:
+      - "on"
+      - "Available"
+
+  # Trigger action at elevation after sunrise.
+  - trigger: numeric_state
+    entity_id: sun.sun
+    attribute: elevation
+    above: !input sunrise_elevation_start_trigger
+
+conditions:
+
+  - condition: state
+    entity_id: !input car_location_tracker
+    state: home
+
+  - condition: state
+    entity_id: !input car_sensor_charger_pluggedin
+    state:
+      - "on"
+      - "Available"
+
+###############################################################################
+# Actions
+###############################################################################
+actions:
+
+  - if:
+      - condition: template
+        value_template: "{{ useTeslaApi }}"
+    then:
+      # Wake up Tesla.
+      - service: button.press
+        data: {}
+        target:
+          entity_id: !input car_button_wake_up
+      - delay: "{{ wait_car_wakeup }}"
+
+      # Get the latest data from Tesla to update HA.
+      - service: button.press
+        data: {}
+        target:
+          entity_id: !input car_button_forceupdate_ha
+      - delay: "{{ wait_command_execute }}"
+
+      # Sanity check in case of manual run.
+      # Do not manually run this script if car is not at home, because it affects car charging anywhere.
+      - if:
+          - condition: template
+            value_template: "{{ states(carLocationTracker) != 'home' }}"
+        then:
+          - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
+
+  # Always set initial charge current here.  Otherwise if the charger is already on, it might not be set for sometime until there is a change.
+  # The new charge current value will only be set if the old and new values are different. Confirmed in log.
+  - service: number.set_value
+    data:
+      value: "{{ initial_charge_current }}"
+    target:
+      entity_id: !input car_number_charging_amps
+  - delay: "{{ wait_command_execute }}"
+
+  #####################################
+  # Set car charge limit on start up
+  #####################################
+  # Should honour existing charge limit set by app or car, unless set daily car charge limit is toggled on.
+  #
+  # If set daily car charge limit is toggled off, charge limit will be set according to the Tesla app.
+  # If set daily car charge limit is toggled on and charge car based on weather is disabled, charge limit will be set according to the limit configured for the day.
+  # If set daily car charge limit is toggled on and charge car based on weather is enabled, charge limit will be adjusted to the highest limit set within the rainy forecast period taking into account the car charge limit on bad weather setting.
+  #
+  # If charge car based on weather is enabled, daily car charge limit and weather provider settings must be configured.
+
+  - choose:
+
+    # Note the following syntax caused variables not to be highlighted in HA trace "Step Config" tab.
+    #- conditions: >
+    #    {{ todayCarChargeLimit >= car_charge_limit_min and todayCarChargeLimit <= car_charge_limit_max }}
+
+    - conditions:
+        - alias: "If set daily car charge limit on start up"
+          condition: template
+          value_template: "{{ is_state(setDailyCarChargeLimit, 'on') and useTeslaApi }}"
+
+      # Then set charge limit base on config
+      sequence:
+        - if:
+            - alias: "If charge car based on weather"
+              condition: template
+              value_template: "{{ chargeCarBaseOnWeather }}"
+          then:
+            - alias: "Then get weather forecast data"
+              service: weather.get_forecasts
+              target:
+                entity_id: !input weather_provider
+              data:
+                type: "{{ forecast_interval }}"
+              response_variable: weather_forecast
+
+        - variables:
+            # Period forecast list excluding today
+            periodForecastList: >
+              {% set data = namespace(strings=[]) %}
+              {% if chargeCarBaseOnWeather %}
+                {% for day in range(1, forecast_index + 1, 1) %}
+                  {% set data.strings = data.strings + [weather_forecast[weather_provider]['forecast'][day][forecast_attribute]] %}
+                {% endfor %}
+              {% endif %}
+              {{ data.strings }}
+
+            weather_today: >
+              {% if chargeCarBaseOnWeather %}
+                {{ weather_forecast[weather_provider]['forecast'][0][forecast_attribute] }}
+              {% else %}
+                {{ "weather forecast disabled" }}
+              {% endif %}
+
+            # Charge limit list for the next N days excluding today. Also take into account carChargeLimitOnBadWeather.
+            badWeatherPeriodChargeLimitList: >
+              {% set data = namespace(numbers=[carChargeLimitOnBadWeather]) %}
+              {% for i in range(1, forecast_index + 1, 1) %}
+                {% set day = (todayIndex + i) % 7 %}
+                {% set data.numbers = data.numbers + [car_charge_limit_list[day]] %}
+              {% endfor %}
+              {{ data.numbers }}
+
+            badWeatherPeriodMaxChargeLimit: "{{ badWeatherPeriodChargeLimitList | max }}"
+
+            todayCarChargeLimit: "{{ car_charge_limit_list[todayIndex] }}"
+
+            # See https://www.home-assistant.io/integrations/weather/
+            # Some possible values: rainy, cloudy, partlycloudy, clear-night
+            finalCarChargeLimit: >
+              {% if chargeCarBaseOnWeather
+              and 'rainy' in periodForecastList
+              and badWeatherPeriodMaxChargeLimit > todayCarChargeLimit %}
+                {{ badWeatherPeriodMaxChargeLimit }}
+              {% else %}
+                {{ todayCarChargeLimit }} 
+              {% endif %}
+
+        # Show current status
+        - service: system_log.write
+          data_template:
+            message: |-
+              {{now()}}: 
+              finalCarChargeLimit={{finalCarChargeLimit}}, todayCarChargeLimit={{todayCarChargeLimit}}, carChargeLimitOnBadWeather={{carChargeLimitOnBadWeather}},
+              badWeatherPeriodMaxChargeLimit={{badWeatherPeriodMaxChargeLimit}}, badWeatherPeriodChargeLimitList={{badWeatherPeriodChargeLimitList}}, periodForecastList={{periodForecastList}},
+              todayIndex={{todayIndex}}, car_charge_limit_list={{car_charge_limit_list}}, weather_today={{weather_today}}
+            #level: warning
+            level: info
+
+        # Changing charge limit can turn on or off charger by car depending on whether charge limit has been reached or not.
+        - service: number.set_value
+          data:
+            value: "{{ finalCarChargeLimit }}"
+          target:
+            entity_id: !input car_number_charge_limit
+        - delay: "{{ wait_charge_limit }}"
+
+        # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
+        - service: button.press
+          data: {}
+          target:
+            entity_id: !input car_button_forceupdate_ha
+        - delay: "{{ wait_command_execute }}"
+
+  #####################################
+  # Main while loop
+  #####################################
+  - repeat:
+
+      # Only start charging when following conditions are met, otherwise exit script.
+      while:
+        - condition: and
+          conditions:
+
+            - alias: "Continue if stop button is toggled off"
+              condition: template
+              value_template: "{{ is_state(stop_charger, 'off') }}"
+
+            - alias: "Continue if charger is plugged in"
+              condition: state
+              entity_id: !input car_sensor_charger_pluggedin
+              state:
+                - "on"
+                - "Available"
+                - "Charging"
+
+            - alias: "Continue if battery is below charge limit"
+              condition: template
+              value_template: >
+                {{ (states(carBatteryLevel) | int) < (states(carChargeLimit) | int) }}
+
+            - condition: or
+              conditions:
+
+                - alias: "Continue if using secondary power source"
+                  condition: template
+                  value_template: "{{ is_state(useSecondaryPowerSource, 'on') }}"
+
+                - alias: "Continue if sun is above start or end elevations"
+                  condition: template
+                  value_template: >
+                    {{ (is_state_attr('sun.sun', 'rising', true) and state_attr('sun.sun', 'elevation') > sunrise_elevation_start_trigger)
+                    or (is_state_attr('sun.sun', 'rising', false) and state_attr('sun.sun', 'elevation') > sunset_elevation_end_trigger) }}
+
+      sequence:
+
+        # Switch on charger before calculating power usage. Accuracy depends on rate of main_power_net update.
+        - if:
+            - alias: "If looping for the first time in while loop"
+              condition: template
+              value_template: "{{ repeat.index == 1 }}"
+          then:
+            - alias: "Then turn on charger if not already on"
+              if:
+                - condition: template
+                  value_template: "{{ not (is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging')) }}"
+              then:
+                # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
+                - service: switch.turn_on
+                  data: {}
+                  target:
+                    entity_id: !input car_switch_charger
+                - delay: "{{ wait_charger_on }}"
+
+                # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
+                - if:
+                    - condition: template
+                      value_template: "{{ useTeslaApi }}"
+                  then:
+                    - service: button.press
+                      data: {}
+                      target:
+                        entity_id: !input car_button_forceupdate_ha
+                    - delay: "{{ wait_command_execute }}"
+
+        - variables:
+            # Sensor main_power_net expresses negative value in Watts for available power or positive value for consumed power.
+            # For other inverter brands, adjust the formula to conform with above requirement according to your setup.
+            main_power_net: !input sensor_main_power_net
+
+            # Can adjust skew depending on home battery state of charge for future enhancement
+            skew: >
+              {{ skew_default }}
+
+            # Not used
+            #isDaytime: >
+            #  {% if (is_state_attr('sun.sun', 'rising', true) and state_attr('sun.sun', 'elevation') > sunrise_elevation_start_trigger)
+            #  or (is_state_attr('sun.sun', 'rising', false) and state_attr('sun.sun', 'elevation') > sunset_elevation_end_trigger) %}
+            #    {{ true }}
+            #  {% else %}
+            #    {{ false }}
+            #  {% endif %}
+
+            # -ve to use from secondary power source, +ve to export to secondary power source.
+            #powerOffset: >
+            #  {% if is_state(useSecondaryPowerSource, 'on') %}
+            #    {% if has_value(powerOffsetFromZero) %}
+            #      {{ states(powerOffsetFromZero) | int }}
+            #    {% else %}
+            #      {{ 0 }}
+            #    {% endif %}
+            #  {% else %}
+            #    {{ 0 }}
+            #  {% endif %}
+
+            # -ve to use from secondary power source, +ve to export to secondary power source.
+            powerOffset: >
+              {% if is_state(useSecondaryPowerSource, 'on') %}
+                {{ states(powerOffsetFromZero) | int }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
+
+            # Net power from all sources (default 0 set by float(0) if cannot convert to float).
+            all_power_net: >
+              {{ states(main_power_net) | float(0) + powerOffset }} 
+
+            # This can be greater than car_charger_max_current.
+            # +ve => importing amp from grid, -ve => exporting amp to grid
+            all_current_net: "{{ (all_power_net / one_amp_watt_step) | float }}"
+
+            # Charge current for this sequence run, including sanity check to ensure within limits.
+            charge_current: >
+              {% if states(car_charging_amps) | int < 0 %}
+                {{ 0 }}
+              {% elif states(car_charging_amps) | int > car_charger_max_current %}
+                {{ car_charger_max_current }}
+              {% else %}
+                {{ states(car_charging_amps) | int }}
+              {% endif %}
+
+            # If importing from grid, will try to decrease charge current by same consumption or min charger current.
+            # If exporting to grid, will try to increase charge current by same production or max charger current.
+            new_charge_current: >
+              {% if all_current_net > 0 %}
+                {{ [car_charger_min_current, charge_current - all_current_net] | max | round(0) }}
+              {% else %}
+                {{ [car_charger_max_current, charge_current - all_current_net] | min | round(0) }}
+              {% endif %}
+
+        - choose:
+
+          - conditions:
+              - alias: "Exit script if charger is turned off"
+                condition: template
+                value_template: "{{ not (is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging')) }}"
+
+            sequence:
+              # Get the latest data from Tesla to update HA before exiting script
+              - if:
+                  - condition: template
+                    value_template: "{{ useTeslaApi }}"
+                then:
+                  - service: button.press
+                    data: {}
+                    target:
+                      entity_id: !input car_button_forceupdate_ha
+                  - delay: "{{ wait_command_execute }}"
+
+              - stop: "Exiting script due to charger turned off manually or automatically by car when charge limit reached."
+                # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
+                # Cannot get response_variable to work. Needs to be key/value pair?
+                #response_variable: "stop_charging_reason"
+
+          # all_power_net < -69W, ie. need to increase charger current.
+          - conditions:
+              - alias: "If exporting power to grid"
+                condition: template
+                value_template: "{{ all_power_net < (0 + skew) * one_amp_watt_step }}"
+            sequence:
+              # Gradually increase current with 1A step.
+              - alias: "Then increase charger current"
+                repeat:
+                  while: "{{ (charge_current + repeat.index) <= new_charge_current }}"
+                  sequence:
+                    - service: number.set_value
+                      data_template:
+                        value: "{{ charge_current + repeat.index }}"
+                      target:
+                        entity_id: !input car_number_charging_amps
+                    - delay: "{{ wait_current_change }}"
+
+          # all_power_net >= 161W, ie. need to decrease charger current.
+          - conditions:
+              - alias: "If importing power from grid"
+                condition: template
+                value_template: "{{ all_power_net >= (1 + skew) * one_amp_watt_step }}"
+            sequence:
+              # Gradually decrease current with 1A step.
+              - alias: "Then decrease charger current"
+                repeat:
+                  while: "{{ (charge_current - repeat.index) >= new_charge_current }}"
+                  sequence:
+                    - service: number.set_value
+                      data_template:
+                        value: "{{ charge_current - repeat.index }}"
+                      target:
+                        entity_id: !input car_number_charging_amps
+                    - delay: "{{ wait_current_change }}"
+
+          # 161 > all_power_net >= -69W, ie. do nothing.
+          - conditions:
+              - alias: "If power import/export is around zero"
+                condition: template
+                value_template: "{{ (1 + skew) * one_amp_watt_step > all_power_net >= (0 + skew) * one_amp_watt_step }}"
+            sequence:
+              - alias: "Then do not change charger current"
+                delay: "00:00:00"
+
+          # Default do nothing.
+          default:
+            - alias: "Should never get to this default branch"
+              delay: "00:00:00"
+
+        # Sleep enough to allow solar inverter updates. Should be ok to sleep longer to avoid changing charge current too often.
+        # Other things can happen during sleep time, eg. car unplugged.
+        - delay:
+            hours: 0
+            minutes: 0
+            seconds: !input wait_main_power_net_update
+            milliseconds: 0
+
+        # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
+        - if:
+            - condition: template
+              value_template: "{{ useTeslaApi }}"
+          then:
+            - service: button.press
+              data: {}
+              target:
+                entity_id: !input car_button_forceupdate_ha
+            - delay: "{{ wait_command_execute }}"
+
+  #####################################
+  # Exit script
+  #####################################
+  - if:
+      - condition: template
+        value_template: "{{ is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging') }}"
+    then:
+      # Gradually decrease to 0A with 1A step, otherwise Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
+      - variables:
+          charge_current: "{{ states(car_charging_amps) | int }}"
+      - repeat:
+          while: "{{ (charge_current - repeat.index) >= 0 }}"
+          sequence:
+            - service: number.set_value
+              data_template:
+                value: "{{ charge_current - repeat.index }}"
+              target:
+                entity_id: !input car_number_charging_amps
+            - delay: "{{ wait_current_change }}"
+      - delay: "{{ wait_command_execute }}"
+
+      # Turn off charger.
+      - service: switch.turn_off
+        data: {}
+        target:
+          entity_id: !input car_switch_charger
+      - delay: "{{ wait_charger_off }}"
+
+  # Set current to 5A on exit because charger is turned off on reaching charge limit and had no chance to set current to 0.
+  - service: number.set_value
+    data:
+      value: "{{ initial_charge_current }}"
+    target:
+      entity_id: !input car_number_charging_amps
+  - delay: "{{ wait_command_execute }}"
+
+  # Get the latest data from Tesla to update HA before exiting script.
+  - if:
+      - condition: template
+        value_template: "{{ useTeslaApi }}"
+    then:
+      - service: button.press
+        data: {}
+        target:
+          entity_id: !input car_button_forceupdate_ha
+      - delay: "{{ wait_command_execute }}"

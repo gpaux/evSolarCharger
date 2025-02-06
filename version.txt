@@ -1,0 +1,94 @@
+EV Solar Charger
+================
+
+v3.0    5/2/2025
+-   Modified from TeslaSolarCharger v2.1d.
+-   Added support to control OCPP compatible charger.
+
+v2.1d   27/1/2025
+-   Breaking change: Need to define helper number or template sensor for power offset to charge from grid.
+-   Set current to 5A on exit because charger is turned off on reaching charge limit and had no chance to set current to 0.
+-   Added note on how to possibly charge multiple Tesla cars at the same time based on power allocation weighting.
+
+v2.1c   16/12/2024
+-   Removed 30 seconds delay for overriding charge limit. To override charge limit, set charge limit from Tesla app and toggle off setting daily charge limit.
+
+v2.1b   14/12/2024
+-   Do not manually run this script if car is not at home, because it affects car charging anywhere.
+-   Tidied syntax.
+
+v2.1a    11/12/2024
+-   Tidied code.
+-   Fixed issue with occasional unexpected exit on start up due to charger status not up-to-date.
+
+v2.1    9/12/2024
+-   Breaking change: Need to create new input boolean to enable or disable use of daily car charge limit config. Sometimes it is easier to just use the Tesla app charge limit.
+
+v2.0b   8/12/2024
+-   Tidied up code syntax.
+-   More diagnostic info during tracing by using "alias" command.
+
+v2.0a   20/11/2024
+-   Updated doc.
+-   Took "turn charger on" out of choose condition to speed up current change on startup.
+
+v2.0    14/11/2024
+-   Use sun elevation triggers instead of sunrise/sunset time offsets to start and stop script.
+-   Allow top up from grid if there is not enough solar electricity.
+-   Removed feature to charge from grid with constant current.
+
+v1.1e   13/11/2024
+-   Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
+
+v1.1d   7/11/2024
+-   Updated doc.
+-   Setting the charge limit might cause car to turn on charger, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
+
+v1.1c   29/10/2024
+-   Restoring charge limit to a higher value at script end will trigger Tesla to charge to the higher value. So don't save car_number_charge_limit in scene.
+-   Cannot restore car_number_charging_amps reliably, so disabled scene save and restore.
+-   Set minimal current before exit to avoid high current when starting next charging session.
+-   Enforced valid charge limit range 50-100% for Tesla API.
+-   Refactored setting car charge limit code.
+
+v1.1b	8/10/2024
+-   Wait 30 seconds after setting car charge limit to allow user override when not using Tesla app charge limit.
+-   Finalised defaults.
+
+v1.1    26/9/2024
+-   Configurable daily car charge limit for 7 days.
+-   Automatically adjust to the highest charge limit set within a rainy forecast period.
+
+v1.0    2/10/2023
+-   For exit loop criteria, need to test charger switched off condition before charge from grid condition.
+
+v0.9    27/9/2023
+-   Specify the minimum charging current to keep charging the car when there is no excess solar electricity.
+
+v0.8    14/9/2023
+-   Enforced integer input type, otherwise will get "TypeError: '>' not supported between instances of 'int' and 'str'".
+
+v0.7    17/8/2023
+-   Set default sunrise trigger to 30 minutes after sunrise.
+-   Removed support for absolute stop time to facilitate off-peak night time charging.
+
+v0.6    16/8/2023
+-   Support multi-day charging using sunrise trigger.
+-   Turning on charger will also trigger script action so that charging is always managed by script.
+
+v0.5    30/7/2023
+-   Changed behaviour to always charge from excess solar when charger is connected, unless night time or toggled to charge from grid.
+-   Updated doc.
+
+v0.4    6/7/2023
+-   Enhanced code to exit when reaching charge limit or if charger is turned off.
+
+v0.3    2/7/2023
+-   Enforce max and min current limits.
+
+v0.2    1/07/2023
+-   Combined automation and script into one file.
+-   Not using grid_power_net for trigger.
+
+v0.1    20/6/2023
+-   Creation.
