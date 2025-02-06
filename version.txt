@@ -1,9 +1,9 @@
 EV Solar Charger
 ================
 
-v3.0    5/2/2025
+v3.0beta    5/2/2025
 -   Modified from TeslaSolarCharger v2.1d.
--   Added support to control OCPP compatible charger.
+-   Added support to control OCPP compatible charger.  Tested using OCPP simulator only.
 
 v2.1d   27/1/2025
 -   Breaking change: Need to define helper number or template sensor for power offset to charge from grid.

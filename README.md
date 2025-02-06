@@ -1,5 +1,5 @@
 # EV Solar Charger
-Home Assistant Blueprint using Tesla API or OCPP to charge EV using surplus solar electricity and weather forecast.
+Home Assistant Blueprint using OCPP or Tesla API to charge EV from excess solar and weather forecast.
 
 ###############################################################################
 # Disclaimer:
