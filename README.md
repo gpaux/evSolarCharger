@@ -184,18 +184,18 @@ Dashboard Tesla solar charger control
 ```
 type: entities
 entities:
-  - entity: automation.[YourTeslaName]_solar_charger_automation
+  - entity: automation.[YourEvName]_solar_charger_automation
   - type: attribute
-    entity: automation.[YourTeslaName]_solar_charger_automation
+    entity: automation.[YourEvName]_solar_charger_automation
     attribute: current
     name: Running instance count
   - type: attribute
-    entity: automation.[YourTeslaName]_solar_charger_automation
+    entity: automation.[YourEvName]_solar_charger_automation
     attribute: last_triggered
     name: Last triggered
-  - entity: input_boolean.[YourTeslaName]_set_daily_car_charge_limit
-  - entity: input_boolean.[YourTeslaName]_charge_from_grid
-  - entity: input_boolean.[YourTeslaName]_stop_charging
+  - entity: input_boolean.[YourEvName]_set_daily_car_charge_limit
+  - entity: input_boolean.[YourEvName]_secondary_power_source
+  - entity: input_boolean.[YourEvName]_stop_charging
   - entity: button.wake_up
   - entity: button.force_data_update
   - entity: device_tracker.location_tracker
