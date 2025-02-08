@@ -752,8 +752,7 @@ actions:
                     - delay: "{{ wait_command_execute }}"
 
         - variables:
-            # Sensor main_power_net expresses negative value in Watts for available power or positive value for consumed power.
-            # For other inverter brands, adjust the formula to conform with above requirement according to your setup.
+            # Sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
             main_power_net: !input sensor_main_power_net
 
             # Can adjust skew depending on home battery state of charge for future enhancement

@@ -36,7 +36,7 @@ Installation
 ```
 template:
 
-    # Sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
+    # For Enphase, sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
     # For other inverter brands, adjust the formula to conform with above requirement according to your setup.
     - sensor:
         name: Main Power Net
@@ -57,7 +57,7 @@ template:
 
 -	Create 3 helper booleans, eg.
 Settings > Devices & Services > Helpers > Create Helper > Toggle
-1.	MyEV set daily car charge limit (requires Tesla API)
+1.	MyEV set daily car charge limit (should be toggled off unless using Tesla API)
 2.	MyEV secondary power source
 3.	MyEV stop charging
 
