@@ -55,15 +55,13 @@ template:
 -	Import the Blueprint automatically by clicking above, or manually copy the Blueprint file to following location and reload HA config,
 \\HOMEASSISTANT\config\blueprints\automation\flashg1\ev_solar_charger_automation.yaml
 
--	Create 3 helper booleans, eg.
-Settings > Devices & Services > Helpers > Create Helper > Toggle
-1.	MyEV set daily car charge limit (should be toggled off unless using Tesla API)
-2.	MyEV secondary power source
-3.	MyEV stop charging
-
--	Create 1 helper number or template sensor for power offset (required when charging from grid), eg.
-Settings > Devices & Services > Helpers > Create Helper > Number or Template a sensor
-1.	MyEV power offset
+-	Create following helpers, eg.
+Settings > Devices & Services > Helpers > Create Helper >
+1.  Number: MyEV charger minimum current
+2.	Toggle: MyEV set daily car charge limit (should be toggled off unless using Tesla API)
+3.	Toggle: MyEV secondary power source
+4.	Number or template sensor: MyEV power offset (number or template sensor, required when charging from secondary power source)
+5.	Toggle: MyEV stop charging
 
 -	Config the Blueprint automation specifying charger voltage, maximum current and helper entities created above, ie.
 Settings > Automations & Scenes > Blueprints > EV solar charger automation
