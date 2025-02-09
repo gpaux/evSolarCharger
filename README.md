@@ -60,7 +60,7 @@ Settings > Devices & Services > Helpers > Create Helper >
 1.  Number: MyEV charger minimum current
 2.	Toggle: MyEV set daily car charge limit (should be toggled off unless using Tesla API)
 3.	Toggle: MyEV secondary power source
-4.	Number or template sensor: MyEV power offset (number or template sensor, required when charging from secondary power source)
+4.	Number or template sensor: MyEV power offset (required when charging from secondary power source)
 5.	Toggle: MyEV stop charging
 
 -	Config the Blueprint automation specifying charger voltage, maximum current and helper entities created above, ie.
