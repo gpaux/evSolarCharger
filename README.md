@@ -75,8 +75,8 @@ My setup
 
 -	Home Assistant, https://www.home-assistant.io/
 -	Enphase Envoy Integration configured for 30 seconds update interval, https://www.home-assistant.io/integrations/enphase_envoy
--	Tesla Custom Integration v3.20.4 (this is only required if you need Tesla API to control charging), https://github.com/alandtse/tesla
-- OCPP v0.70, https://github.com/lbbrhzn/ocpp
+-	Tesla Custom Integration v3.20.4 (this is only required if you need to use Tesla API to control a Tesla car for charging), https://github.com/alandtse/tesla
+- OCPP v0.70 (this is only required if you need to use OCPP to control an OCPP compliant charger to charge an EV), https://github.com/lbbrhzn/ocpp
 -	Tesla UMC charger, 230V, max 15A.
 -	Tesla Model 3.
 
