@@ -24,7 +24,7 @@ Features
 -   Might be possible to prolong car battery life by setting daily charge limit to 70%, and only charge more before a rainy period by enabling option to adjust daily car charge limit based on weather.
 -   Allow top up from secondary power source (eg. grid, battery) if there is not enough solar electricity.  Need to toggle on secondary power source and set power offset to draw power from secondary source.
 -   Support charging multiple cars at the same time based on power allocation weighting for each car.
--   Beta feature: Use either Tesla API to control a Tesla car for charging, or use OCPP to control an OCPP compliant charger to charge a EV.  Only tested with OCPP simulator, hence this Blueprint most likely won't work with your charger.
+-   Beta feature: Use either Tesla API to control a Tesla car for charging, or use OCPP to control an OCPP compliant charger to charge a EV.  Only tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator), hence this Blueprint most likely won't work with your charger.
 
 
 Installation
@@ -150,8 +150,8 @@ State class: Measurement
 GUI display examples
 ====================
 
-Dashboard Tesla power card
---------------------------
+Dashboard Tesla style power card
+--------------------------------
 https://github.com/reptilex/tesla-style-solar-power-card
 
 ```
@@ -177,8 +177,8 @@ generation_entity: sensor.solar_power_production
 
 ```
 
-Dashboard Tesla solar charger control
--------------------------------------
+Dashboard EV solar charger control
+----------------------------------
 ```
 type: entities
 entities:
@@ -193,6 +193,8 @@ entities:
     name: Last triggered
   - entity: input_boolean.[YourEvName]_set_daily_car_charge_limit
   - entity: input_boolean.[YourEvName]_secondary_power_source
+  - entity: input_number.[YourEvName]_charger_minimum_current
+  - entity: input_number.[YourEvName]_power_offset
   - entity: input_boolean.[YourEvName]_stop_charging
   - entity: button.wake_up
   - entity: button.force_data_update

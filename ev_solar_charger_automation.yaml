@@ -797,7 +797,7 @@ actions:
                 {{ [carChargerMaxCurrent, carChargeCurrent - allCurrentNet] | min | round(0) }}
               {% endif %}
             
-            # Ensure new charge current is greater than or equal to charger minimum charge current.
+            # Ensure new charge current is greater than or equal to charger minimum current.
             newChargeCurrent: "{{ [chargerMinCurrent, proposeChargeCurrent] | max }}"
 
             # Not used
