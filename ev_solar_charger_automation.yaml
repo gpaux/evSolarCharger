@@ -114,15 +114,6 @@ blueprint:
           unit_of_measurement: degree
           mode: box
 
-    use_Tesla_api:
-      name: Use Tesla API
-      description: >
-        Toggle on to use Tesla API to control Tesla car for charging.
-        Toggle off to use OCPP to control an OCPP compliant charger to charge a EV.
-      default: false
-      selector:
-        boolean:
-
     toggle_secondary_power_source:
       name: Secondary power source toggle
       description: >
@@ -154,13 +145,25 @@ blueprint:
     # Car daily charge limit
     #####################################
     toggle_set_daily_car_charge_limit:
-      name: Set daily car charge limit toggle (for Tesla car only)
+      name: Set daily car charge limit toggle
       description: >
         Set car charge limit configured for the day once on start up (Settings > Devices & Services > Helpers > Create helper > Toggle).
         If toggled off, the existing car charge limit will be used.
       selector:
         entity:
           domain: input_boolean
+
+    publish_final_car_charge_limit:
+      name: Placeholder for final car charge limit (required for OCPP only)
+      description: >
+        Placeholder for final car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
+        Value determined by script on start up if set daily car charge limit is toggled on, otherwise value must be set by user.
+        The script will stop charging once this charge limit is reached.
+        Equal or higher charge limit must have already been set in EV.
+      default: number.not_defined
+      selector:
+        entity:
+          domain: input_number
 
     car_charge_limit_monday:
       name: Monday
@@ -243,7 +246,7 @@ blueprint:
     # Weather forecast
     #####################################
     charge_car_base_on_weather:
-      name: Adjust daily car charge limit based on weather (for Tesla car only)
+      name: Adjust daily car charge limit based on weather
       description: >
         Automatically adjust to the highest charge limit set within a rainy forecast period.
         Daily car charge limit and weather provider settings must be configured.
@@ -293,7 +296,7 @@ blueprint:
           mode: slider
 
     #####################################
-    # Common config entities
+    # Tesla and OCPP common config entities
     #####################################
     car_sensor_charger_pluggedin:
       name: Charger plugged in sensor
@@ -349,6 +352,15 @@ blueprint:
     #####################################
     # Tesla config entities
     #####################################
+    use_Tesla_api:
+      name: Use Tesla API
+      description: >
+        Toggle on to use Tesla API to control Tesla car for charging.
+        Toggle off to use OCPP to control an OCPP compliant charger to charge a EV.
+      default: false
+      selector:
+        boolean:
+
     car_number_charge_limit:
       name: Tesla charge limit
       description: Entity to control car battery charge limit in percentage (100% = fully charged).
@@ -464,6 +476,7 @@ variables:
   powerOffsetFromZero: !input power_offset_from_zero
   stopCharger: !input toggle_stop_charger
   setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
+  publishFinalCarChargeLimit: !input publish_final_car_charge_limit
 
   carChargeLimit: !input car_number_charge_limit
   carBatteryLevel: !input car_sensor_battery
@@ -591,7 +604,7 @@ actions:
     - conditions:
         - alias: "If set daily car charge limit on start up"
           condition: template
-          value_template: "{{ is_state(setDailyCarChargeLimit, 'on') and useTeslaApi }}"
+          value_template: "{{ is_state(setDailyCarChargeLimit, 'on') }}"
 
       # Then set charge limit base on config
       sequence:
@@ -661,20 +674,32 @@ actions:
             #level: warning
             level: info
 
-        # Changing charge limit can turn on or off charger by car depending on whether charge limit has been reached or not.
-        - service: number.set_value
-          data:
-            value: "{{ finalCarChargeLimit }}"
-          target:
-            entity_id: !input car_number_charge_limit
-        - delay: "{{ wait_charge_limit }}"
+        - if:
+            - condition: template
+              value_template: "{{ useTeslaApi }}"
 
-        # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
-        - service: button.press
-          data: {}
-          target:
-            entity_id: !input car_button_forceupdate_ha
-        - delay: "{{ wait_command_execute }}"
+          then:
+            # Changing charge limit can turn on or off charger by car depending on whether charge limit has been reached or not.
+            - service: number.set_value
+              data:
+                value: "{{ finalCarChargeLimit }}"
+              target:
+                entity_id: !input car_number_charge_limit
+            - delay: "{{ wait_charge_limit }}"
+
+            # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
+            - service: button.press
+              data: {}
+              target:
+                entity_id: !input car_button_forceupdate_ha
+            - delay: "{{ wait_command_execute }}"
+
+          else:
+            # Publish final car charge limit as global variable to be used later on in script.
+            - service: input_number.set_value
+              data_template:
+                entity_id: !input publish_final_car_charge_limit
+                value: "{{ finalCarChargeLimit }}"
 
   #####################################
   # Main while loop
@@ -701,7 +726,11 @@ actions:
             - alias: "Continue if battery is below charge limit"
               condition: template
               value_template: >
-                {{ (states(carBatteryLevel) | int) < (states(carChargeLimit) | int) }}
+                {% if useTeslaApi %}
+                  {{ (states(carBatteryLevel) | int) < (states(carChargeLimit) | int) }}
+                {% else %}
+                  {{ (states(carBatteryLevel) | int) < (states(publishFinalCarChargeLimit) | int) }}
+                {% endif %}
 
             - condition: or
               conditions:
