@@ -57,12 +57,12 @@ template:
 
 -	Create following helpers, eg.
 Settings > Devices & Services > Helpers > Create Helper >
-1.  Number: MyEV charger minimum current
-2.	Toggle: MyEV set daily car charge limit
-3.  Number: MyEV publish final car charge limit (required for OCPP only)
+1.	Toggle: MyEV set daily car charge limit
+2.  Number: MyEV publish final car charge limit (required for OCPP only)
 3.	Toggle: MyEV secondary power source
-4.	Number or template sensor: MyEV power offset (required when charging from secondary power source)
-5.	Toggle: MyEV stop charging
+4.  Number: MyEV charger minimum current
+5.	Number or template sensor: MyEV power offset (required when charging from secondary power source)
+6.	Toggle: MyEV stop charging
 
 -	Config the Blueprint automation specifying charger voltage, maximum current and helper entities created above, ie.
 Settings > Automations & Scenes > Blueprints > EV solar charger automation
@@ -193,6 +193,7 @@ entities:
     attribute: last_triggered
     name: Last triggered
   - entity: input_boolean.[YourEvName]_set_daily_car_charge_limit
+  - entity: input_boolean.[YourEvName]_publish_final_car_charge_limit
   - entity: input_boolean.[YourEvName]_secondary_power_source
   - entity: input_number.[YourEvName]_charger_minimum_current
   - entity: input_number.[YourEvName]_power_offset
