@@ -31,22 +31,16 @@ Features
 Installation
 ============
 
--	Set up "Main Power Net" sensor in Home Assistant (HA) config, eg.
-
-/config/configuration.yaml
+-	Set up "Main Power Net" sensor in Home Assistant (HA) config.  For example, for Enphase, sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.  For other inverter brands, adjust the formula to conform with above requirement according to your setup.
 ```
-template:
+Settings > Devices & services > Helpers > Create helper > Template > Template a sensor >
 
-    # For Enphase, sensor main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
-    # For other inverter brands, adjust the formula to conform with above requirement according to your setup.
-    - sensor:
-        name: Main Power Net
-        state_class: measurement
-        icon: mdi:transmission-tower
-        unit_of_measurement: W
-        device_class: power
-        state: >
-            {{ states('sensor.envoy_[YourEnvoyId]_current_power_consumption')|int - states('sensor.envoy_[YourEnvoyId]_current_power_production')|int }}
+Name: Main power net
+State template: {{ states('sensor.envoy_[YourEnvoyId]_current_power_consumption')|int - states('sensor.envoy_[YourEnvoyId]_current_power_production')|int }}
+Unit of measurement: W
+Device class: Power
+State class: Measurement
+Device: Envoy [YourEnvoyId]
 ```
 
 - If using OCPP charger, configure your charger to point to your HA OCPP central server, eg. ws://homeassistant.local:9000
@@ -59,7 +53,7 @@ template:
 -	Create following helpers, eg.
 Settings > Devices & Services > Helpers > Create Helper >
 1.	Toggle: MyEV set daily car charge limit
-2.  Number: MyEV publish final car charge limit (required for OCPP only)
+2.  Number: MyEV publish car charge limit (required for OCPP only)
 3.	Toggle: MyEV secondary power source
 4.  Number: MyEV charger minimum current
 5.	Number or template sensor: MyEV power offset (required when charging from secondary power source)

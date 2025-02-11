@@ -153,10 +153,10 @@ blueprint:
         entity:
           domain: input_boolean
 
-    publish_final_car_charge_limit:
-      name: Placeholder for final car charge limit (required for OCPP only)
+    publish_car_charge_limit:
+      name: Publish car charge limit (required for OCPP only)
       description: >
-        Placeholder for final car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
+        Placeholder for car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
         Value determined by script on start up if set daily car charge limit is toggled on, otherwise value must be set by user.
         The script will stop charging once this charge limit is reached.
         Equal or higher charge limit must have already been set in EV.
@@ -476,14 +476,14 @@ variables:
   powerOffsetFromZero: !input power_offset_from_zero
   stopCharger: !input toggle_stop_charger
   setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
-  publishFinalCarChargeLimit: !input publish_final_car_charge_limit
+  publishCarChargeLimit: !input publish_car_charge_limit
 
-  carChargeLimit: !input car_number_charge_limit
   carBatteryLevel: !input car_sensor_battery
-
   isCarCharging: !input car_sensor_charging
   carChargingAmps: !input car_number_charging_amps
-  carLocationTracker: !input car_location_tracker
+
+  teslaCarChargeLimit: !input car_number_charge_limit
+  teslaCarLocation: !input car_location_tracker
 
   #####################################
   # Set car charge limit based on which week day
@@ -534,9 +534,14 @@ triggers:
 
 conditions:
 
-  - condition: state
-    entity_id: !input car_location_tracker
-    state: home
+  # OCPP charger will know when it is plugged in at location.
+  - condition: template
+    value_template: >
+      {% if useTeslaApi %}
+        {{ is_state(teslaCarLocation, 'home') }}
+      {% else %}
+        {{ true }}
+      {% endif %}
 
   - condition: state
     entity_id: !input car_sensor_charger_pluggedin
@@ -571,7 +576,7 @@ actions:
       # Do not manually run this script if car is not at home, because it affects car charging anywhere.
       - if:
           - condition: template
-            value_template: "{{ states(carLocationTracker) != 'home' }}"
+            value_template: "{{ states(teslaCarLocation) != 'home' }}"
         then:
           - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
 
@@ -698,7 +703,7 @@ actions:
             # Publish final car charge limit as global variable to be used later on in script.
             - service: input_number.set_value
               data_template:
-                entity_id: !input publish_final_car_charge_limit
+                entity_id: !input publish_car_charge_limit
                 value: "{{ finalCarChargeLimit }}"
 
   #####################################
@@ -727,9 +732,9 @@ actions:
               condition: template
               value_template: >
                 {% if useTeslaApi %}
-                  {{ (states(carBatteryLevel) | int) < (states(carChargeLimit) | int) }}
+                  {{ (states(carBatteryLevel) | int) < (states(teslaCarChargeLimit) | int) }}
                 {% else %}
-                  {{ (states(carBatteryLevel) | int) < (states(publishFinalCarChargeLimit) | int) }}
+                  {{ (states(carBatteryLevel) | int) < (states(publishCarChargeLimit) | int) }}
                 {% endif %}
 
             - condition: or
