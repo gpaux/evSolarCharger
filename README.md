@@ -188,7 +188,7 @@ entities:
     attribute: last_triggered
     name: Last triggered
   - entity: input_boolean.[YourEvName]_set_daily_car_charge_limit
-  - entity: input_boolean.[YourEvName]_publish_final_car_charge_limit
+  - entity: input_boolean.[YourEvName]_publish_car_charge_limit
   - entity: input_boolean.[YourEvName]_secondary_power_source
   - entity: input_number.[YourEvName]_charger_minimum_current
   - entity: input_number.[YourEvName]_power_offset
