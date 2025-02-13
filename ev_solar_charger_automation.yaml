@@ -73,6 +73,15 @@ blueprint:
           unit_of_measurement: amp
           mode: box
 
+    step_current_change:
+      name: Adjust charger current using step change
+      description: >
+        Adjust charger current using 1 Amp step change to gradually increase or decrease the current.
+        Otherwise current will be set directly with single API call without stepping.
+      default: true
+      selector:
+        boolean:
+
     power_draw_skew:
       name: Power draw skew
       description: >
@@ -466,6 +475,7 @@ variables:
   # Must not use states() to access local variables
   carChargerVoltage: !input charger_voltage
   carChargerMaxCurrent: !input charger_max_current
+  isStepCurrentChange: !input step_current_change
 
   # The skew shifts the power export/import curve left or right defining the range where power can fluctuate without causing charger current adjustment. 
   # The higher the skew, the lesser the chance to import power and more likely to export power.
@@ -898,14 +908,26 @@ actions:
                 # Cannot get response_variable to work. Needs to be key/value pair?
                 #response_variable: "stop_charging_reason"
 
+          # Need to change charger current without stepping.
+          - conditions:
+              - alias: "If need to change charge current without stepping"
+                condition: template
+                value_template: "{{ not isStepCurrentChange and newChargeCurrent != carChargeCurrent }}"
+            sequence:
+              - alias: "Then change charger current without stepping"
+                service: number.set_value
+                data_template:
+                  value: "{{ newChargeCurrent }}"
+                target:
+                  entity_id: !input car_number_charging_amps
+
           # Need to increase charger current.
           - conditions:
               - alias: "If need to increase charge current"
                 condition: template
                 value_template: "{{ newChargeCurrent > carChargeCurrent }}"
             sequence:
-              # Gradually increase current with 1A step.
-              - alias: "Then increase charger current"
+              - alias: "Then increase charger current with 1A step"
                 repeat:
                   while: "{{ (carChargeCurrent + repeat.index) <= newChargeCurrent }}"
                   sequence:
@@ -922,8 +944,7 @@ actions:
                 condition: template
                 value_template: "{{ newChargeCurrent < carChargeCurrent }}"
             sequence:
-              # Gradually decrease current with 1A step.
-              - alias: "Then decrease charger current"
+              - alias: "Then decrease charger current with 1A step"
                 repeat:
                   while: "{{ (carChargeCurrent - repeat.index) >= newChargeCurrent }}"
                   sequence:
@@ -970,22 +991,32 @@ actions:
   #####################################
   # Exit script
   #####################################
+  # Gradually decrease to 0A with 1A step, otherwise Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
   - if:
       - condition: template
         value_template: "{{ is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging') }}"
     then:
-      # Gradually decrease to 0A with 1A step, otherwise Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
       - variables:
           carChargeCurrent: "{{ states(carChargingAmps) | int }}"
-      - repeat:
-          while: "{{ (carChargeCurrent - repeat.index) >= 0 }}"
-          sequence:
-            - service: number.set_value
-              data_template:
-                value: "{{ carChargeCurrent - repeat.index }}"
-              target:
-                entity_id: !input car_number_charging_amps
-            - delay: "{{ wait_current_change }}"
+      - if:
+          - condition: template
+            value_template: "{{ isStepCurrentChange }}"
+        then:
+          - repeat:
+              while: "{{ (carChargeCurrent - repeat.index) >= 0 }}"
+              sequence:
+                - service: number.set_value
+                  data_template:
+                    value: "{{ carChargeCurrent - repeat.index }}"
+                  target:
+                    entity_id: !input car_number_charging_amps
+                - delay: "{{ wait_current_change }}"
+        else:
+          - service: number.set_value
+            data_template:
+              value: "{{ 0 }}"
+            target:
+              entity_id: !input car_number_charging_amps
       - delay: "{{ wait_command_execute }}"
 
       # Turn off charger.
