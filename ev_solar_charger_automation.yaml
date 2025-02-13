@@ -79,10 +79,10 @@ blueprint:
         The skew shifts the power export/import curve left or right defining the range where power can fluctuate without causing charger current adjustment. 
         The higher the skew, the less likely to import power and more likely to export power.
         Skew should be kept between 0 and 1 inclusive.  Default = 0.3
-          Lower range = P*skew*(-1) - P/2
-          Upper range = P*skew*(-1) + P/2
-          Where P = Charger voltage * 1 Amp
-        Eg. Charger voltage=230V, skew=0.3 => Lower range=-184W, Upper range=+46W
+          Lower range = P * Skew * (-1) - P/2
+          Upper range = P * Skew * (-1) + P/2
+          Where P = Charger voltage * 1Amp
+        Eg. Charger voltage=230V, Skew=0.3 => Lower range=-184W, Upper range=+46W
       default: 0.3
       selector:
         number:
