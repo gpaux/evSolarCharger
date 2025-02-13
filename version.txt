@@ -1,11 +1,12 @@
 EV Solar Charger
 ================
 
-v3.0beta    5/2/2025
+v3.0beta1    5/2/2025
 -   Modified from TeslaSolarCharger v2.1d https://github.com/flashg1/TeslaSolarCharger
 -   Added support to control OCPP compatible charger.  Tested using OCPP simulator only.
 -   Enforce charger minumum current if greater than 0, configurable using helper number.
 -   Keep own charge limit if using OCPP.
+-   Support skew to shift the power export/import curve left or right to achieve minimal power import.
 -   Tidied code and updated doc.
 
 v2.1d   27/1/2025
