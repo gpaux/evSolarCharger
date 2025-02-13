@@ -26,7 +26,7 @@ Features
 -   Support setting minimum charge current if there is not enough solar electricity.
 -   Support charging multiple cars at the same time based on power allocation weighting for each car.
 -   Support skew to shift the power export/import curve left or right to achieve minimal power import.
--   Beta feature: Use either Tesla API to control a Tesla car for charging, or use OCPP to control an OCPP compliant charger to charge a EV.  Only tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator), hence this Blueprint most likely won't work with your charger.
+-   Beta feature: Use either Tesla API to control a Tesla car for charging, or use OCPP to control an OCPP compliant charger to charge a EV.  Only tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator), hence this Blueprint most likely won't work with your OCPP charger.
 
 
 Installation
