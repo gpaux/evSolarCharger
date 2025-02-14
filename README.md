@@ -206,3 +206,9 @@ entities:
   - entity: sensor.time_charge_complete
   - entity: lock.charge_port_latch
 ```
+
+**💡 Tip:** If you like my work, consider buying me a tea or coffee!
+
+<a href="https://www.buymeacoffee.com/flashg1" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-black.png" alt="Buy Me A Coffee" width="150px">
+</a>
