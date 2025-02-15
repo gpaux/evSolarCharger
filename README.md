@@ -29,6 +29,24 @@ Features
 -   Beta feature: Use either Tesla API to control a Tesla car for charging, or use OCPP to control an OCPP compliant charger to charge a EV.  Only tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator), hence this Blueprint most likely won't work with your OCPP charger.
 
 
+**💡 Tip:** If you like my work, consider buying me a tea or coffee!
+
+<a href="https://www.buymeacoffee.com/flashg1" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-black.png" alt="Buy Me A Coffee" width="150px">
+</a>
+
+
+My setup
+========
+
+-	Home Assistant, https://www.home-assistant.io/
+-	Enphase Envoy Integration configured for 30 seconds update interval, https://www.home-assistant.io/integrations/enphase_envoy
+-	Tesla Custom Integration v3.20.4 (this is only required if you need to use Tesla API to control a Tesla car for charging), https://github.com/alandtse/tesla
+- OCPP v0.70 (this is only required if you need to use OCPP to control an OCPP compliant charger to charge an EV), https://github.com/lbbrhzn/ocpp
+-	Tesla UMC charger, 230V, max 15A.
+-	Tesla Model 3.
+
+
 Installation
 ============
 
@@ -62,18 +80,6 @@ Settings > Devices & Services > Helpers > Create Helper >
 
 -	Config the Blueprint automation specifying charger voltage, maximum current and helper entities created above, ie.
 Settings > Automations & Scenes > Blueprints > EV solar charger automation
-
-
-
-My setup
-========
-
--	Home Assistant, https://www.home-assistant.io/
--	Enphase Envoy Integration configured for 30 seconds update interval, https://www.home-assistant.io/integrations/enphase_envoy
--	Tesla Custom Integration v3.20.4 (this is only required if you need to use Tesla API to control a Tesla car for charging), https://github.com/alandtse/tesla
-- OCPP v0.70 (this is only required if you need to use OCPP to control an OCPP compliant charger to charge an EV), https://github.com/lbbrhzn/ocpp
--	Tesla UMC charger, 230V, max 15A.
--	Tesla Model 3.
 
 
 How to use
@@ -206,9 +212,3 @@ entities:
   - entity: sensor.time_charge_complete
   - entity: lock.charge_port_latch
 ```
-
-**💡 Tip:** If you like my work, consider buying me a tea or coffee!
-
-<a href="https://www.buymeacoffee.com/flashg1" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/default-black.png" alt="Buy Me A Coffee" width="150px">
-</a>
