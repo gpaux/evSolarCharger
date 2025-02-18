@@ -324,6 +324,15 @@ blueprint:
     #####################################
     # OCPP configs
     #####################################
+    use_Tesla_api:
+      name: Use Tesla API
+      description: >
+        Toggle on to use Tesla API to control Tesla car for charging.
+        Toggle off to use OCPP to control an OCPP compliant charger to charge a EV.
+      default: false
+      selector:
+        boolean:
+
     ocpp_charger_name:
       name: OCPP charger name
       description: >
@@ -390,15 +399,6 @@ blueprint:
     #####################################
     # Tesla config entities
     #####################################
-    use_Tesla_api:
-      name: Use Tesla API
-      description: >
-        Toggle on to use Tesla API to control Tesla car for charging.
-        Toggle off to use OCPP to control an OCPP compliant charger to charge a EV.
-      default: false
-      selector:
-        boolean:
-
     car_number_charge_limit:
       name: Tesla charge limit
       description: Entity to control car battery charge limit in percentage (100% = fully charged).
@@ -498,8 +498,8 @@ variables:
   # Upper skewed power = P*skew*(-1) + P/2
   # where P = oneAmpWattStep = carChargerVoltage * 1A, eg. 230W
   #
-  # To test current decrease by 1A with skew=+0.3, set mainPowerNet=47W
-  # To test current increase by 1A with skew=+0.3, set mainPowerNet=-185W
+  # To test current decrease by 1A with skew=+0.3, set e_mainPowerNet=47W
+  # To test current increase by 1A with skew=+0.3, set e_mainPowerNet=-185W
   #
   # Skew  Power fluctuation range     Comment
   # ----------------------------------------------------------------
@@ -523,26 +523,33 @@ variables:
   # The power step in watts to increase or decrease with 1A current change.
   oneAmpWattStep: "{{ carChargerVoltage * 1 }}"
 
-  ocppChargerName: !input ocpp_charger_name
-  ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
-
   #####################################
   # External entities
   #####################################
   # Must use states() to access external entities
-  carChargerMinCurrent: !input charger_min_current
-  useSecondaryPowerSource: !input toggle_secondary_power_source
-  powerOffsetFromZero: !input power_offset_from_zero
-  stopCharger: !input toggle_stop_charger
-  setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
-  publishCarChargeLimit: !input publish_car_charge_limit
 
-  carBatteryLevel: !input car_sensor_battery
-  isCarCharging: !input car_sensor_charging
-  carChargingAmps: !input car_number_charging_amps
+  # sensor_main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
+  e_mainPowerNet: !input sensor_main_power_net
 
-  teslaCarChargeLimit: !input car_number_charge_limit
-  teslaCarLocation: !input car_location_tracker
+  e_carChargerMinCurrent: !input charger_min_current
+  e_useSecondaryPowerSource: !input toggle_secondary_power_source
+  e_powerOffsetFromZero: !input power_offset_from_zero
+  e_stopCharger: !input toggle_stop_charger
+  e_setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
+  e_publishCarChargeLimit: !input publish_car_charge_limit
+
+  e_carBatteryLevel: !input car_sensor_battery
+  e_isCarCharging: !input car_sensor_charging
+  e_carChargingAmps: !input car_number_charging_amps
+
+  e_teslaCarChargeLimit: !input car_number_charge_limit
+  e_teslaCarLocation: !input car_location_tracker
+
+  #####################################
+  # OCPP
+  #####################################
+  ocppChargerName: !input ocpp_charger_name
+  e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
 
   #####################################
   # Set car charge limit based on which week day
@@ -562,7 +569,7 @@ variables:
   #####################################
   # Set car charge limit based on weather forecast
   #####################################
-  weatherProvider: !input weather_provider
+  e_weatherProvider: !input weather_provider
   forecastIndex: !input forecast_index
   forecastAttribute: !input forecast_attribute
   carChargeLimitOnBadWeather: !input car_charge_limit_on_bad_weather
@@ -597,7 +604,7 @@ conditions:
   - condition: template
     value_template: >
       {% if useTeslaApi %}
-        {{ is_state(teslaCarLocation, 'home') }}
+        {{ is_state(e_teslaCarLocation, 'home') }}
       {% else %}
         {{ true }}
       {% endif %}
@@ -635,17 +642,39 @@ actions:
       # Do not manually run this script if car is not at home, because it affects car charging anywhere.
       - if:
           - condition: template
-            value_template: "{{ states(teslaCarLocation) != 'home' }}"
+            value_template: "{{ states(e_teslaCarLocation) != 'home' }}"
         then:
           - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
 
   # Always set initial charge current here.  Otherwise if the charger is already on, it might not be set for sometime until there is a change.
   # The new charge current value will only be set if the old and new values are different. Confirmed in log.
-  - service: number.set_value
-    data:
-      value: "{{ initial_charge_current }}"
-    target:
-      entity_id: !input car_number_charging_amps
+  - if:
+      - condition: template
+        value_template: "{{ useTeslaApi }}"
+    then:
+      - service: number.set_value
+        data:
+          value: "{{ initial_charge_current }}"
+        target:
+          entity_id: !input car_number_charging_amps
+    else:
+      - service: ocpp.set_charge_rate     
+        data:
+          custom_profile: |
+            {
+              "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+              "chargingProfileId": 1,
+              "stackLevel": 0,
+              "chargingProfilePurpose": "TxProfile",
+              "chargingProfileKind": "Relative",
+              "chargingSchedule": {
+                "chargingRateUnit": "A",
+                "chargingSchedulePeriod": [
+                  {"startPeriod": 0, "limit": {{ initial_charge_current }}}  
+                ]
+              }
+            }
+          conn_id: 1
   - delay: "{{ wait_command_execute }}"
 
   #####################################
@@ -668,7 +697,7 @@ actions:
     - conditions:
         - alias: "If set daily car charge limit on start up"
           condition: template
-          value_template: "{{ is_state(setDailyCarChargeLimit, 'on') }}"
+          value_template: "{{ is_state(e_setDailyCarChargeLimit, 'on') }}"
 
       # Then set charge limit base on config
       sequence:
@@ -691,14 +720,14 @@ actions:
               {% set data = namespace(strings=[]) %}
               {% if chargeCarBaseOnWeather %}
                 {% for day in range(1, forecastIndex + 1, 1) %}
-                  {% set data.strings = data.strings + [weather_forecast[weatherProvider]['forecast'][day][forecastAttribute]] %}
+                  {% set data.strings = data.strings + [weather_forecast[e_weatherProvider]['forecast'][day][forecastAttribute]] %}
                 {% endfor %}
               {% endif %}
               {{ data.strings }}
 
             weatherToday: >
               {% if chargeCarBaseOnWeather %}
-                {{ weather_forecast[weatherProvider]['forecast'][0][forecastAttribute] }}
+                {{ weather_forecast[e_weatherProvider]['forecast'][0][forecastAttribute] }}
               {% else %}
                 {{ "weather forecast disabled" }}
               {% endif %}
@@ -777,7 +806,7 @@ actions:
 
             - alias: "Continue if stop button is toggled off"
               condition: template
-              value_template: "{{ is_state(stopCharger, 'off') }}"
+              value_template: "{{ is_state(e_stopCharger, 'off') }}"
 
             - alias: "Continue if charger is plugged in"
               condition: state
@@ -791,9 +820,9 @@ actions:
               condition: template
               value_template: >
                 {% if useTeslaApi %}
-                  {{ (states(carBatteryLevel) | int) < (states(teslaCarChargeLimit) | int) }}
+                  {{ (states(e_carBatteryLevel) | int) < (states(e_teslaCarChargeLimit) | int) }}
                 {% else %}
-                  {{ (states(carBatteryLevel) | int) < (states(publishCarChargeLimit) | int) }}
+                  {{ (states(e_carBatteryLevel) | int) < (states(e_publishCarChargeLimit) | int) }}
                 {% endif %}
 
             - condition: or
@@ -801,7 +830,7 @@ actions:
 
                 - alias: "Continue if using secondary power source"
                   condition: template
-                  value_template: "{{ is_state(useSecondaryPowerSource, 'on') }}"
+                  value_template: "{{ is_state(e_useSecondaryPowerSource, 'on') }}"
 
                 - alias: "Continue if sun is above start or end elevations"
                   condition: template
@@ -820,7 +849,7 @@ actions:
             - alias: "Then turn on charger if not already on"
               if:
                 - condition: template
-                  value_template: "{{ not (is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging')) }}"
+                  value_template: "{{ not (is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging')) }}"
               then:
                 # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
                 - service: switch.turn_on
@@ -841,34 +870,31 @@ actions:
                     - delay: "{{ wait_command_execute }}"
 
         - variables:
-            # sensor_main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
-            mainPowerNet: !input sensor_main_power_net
-
             # Minimum charge current
             chargerMinCurrent: >
-              {% if has_value(carChargerMinCurrent) %}
-                {{ states(carChargerMinCurrent) | int }}
+              {% if has_value(e_carChargerMinCurrent) %}
+                {{ states(e_carChargerMinCurrent) | int }}
               {% else %}
                 {{ 0 }}
               {% endif %}
 
             # -ve to use from secondary power source, +ve to export to secondary power source.
             powerOffset: >
-              {% if is_state(useSecondaryPowerSource, 'on') %}
-                {{ states(powerOffsetFromZero) | int }}
+              {% if is_state(e_useSecondaryPowerSource, 'on') %}
+                {{ states(e_powerOffsetFromZero) | int }}
               {% else %}
                 {{ 0 }}
               {% endif %}
 
             # Net power from all sources (default 0 set by float(0) if cannot convert to float).
-            allPowerNet: "{{ states(mainPowerNet) | float(0) + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
+            allPowerNet: "{{ states(e_mainPowerNet) | float(0) + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
 
             # This can be greater than carChargerMaxCurrent.
             # +ve => importing amp from grid, -ve => exporting amp to grid
             allCurrentNet: "{{ (allPowerNet / oneAmpWattStep) | float }}"
 
             # Charge current for this sequence run, including sanity check to ensure within limits. OCPP has current with 1 decimal place.
-            chargeCurrent: "{{ states(carChargingAmps) | round(0) }}"
+            chargeCurrent: "{{ states(e_carChargingAmps) | round(0) }}"
             carChargeCurrent: >
               {% if chargeCurrent < 0 %}
                 {{ 0 }}
@@ -904,7 +930,7 @@ actions:
           - conditions:
               - alias: "Exit script if charger is turned off"
                 condition: template
-                value_template: "{{ not (is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging')) }}"
+                value_template: "{{ not (is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging')) }}"
 
             sequence:
               # Get the latest data from Tesla to update HA before exiting script
@@ -934,7 +960,7 @@ actions:
                 data:
                   custom_profile: |
                     {
-                      "transactionId": {{ states(ocppChargerTransactionId) | int }},
+                      "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
                       "chargingProfileId": 1,
                       "stackLevel": 0,
                       "chargingProfilePurpose": "TxProfile",
@@ -1034,45 +1060,43 @@ actions:
   # Gradually decrease to 0A with 1A step, otherwise Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
   - if:
       - condition: template
-        value_template: "{{ is_state(isCarCharging, 'on') or is_state(isCarCharging, 'Charging') }}"
+        value_template: "{{ useTeslaApi }}"
     then:
-      - variables:
-          carChargeCurrent: "{{ states(carChargingAmps) | int }}"
-      - if:
-          - condition: template
-            value_template: "{{ isStepCurrentChange }}"
-        then:
-          - repeat:
-              while: "{{ (carChargeCurrent - repeat.index) >= 0 }}"
-              sequence:
-                - service: number.set_value
-                  data_template:
-                    value: "{{ carChargeCurrent - repeat.index }}"
-                  target:
-                    entity_id: !input car_number_charging_amps
-                - delay: "{{ wait_current_change }}"
-        else:
-          - service: number.set_value
-            data_template:
-              value: "{{ 0 }}"
-            target:
-              entity_id: !input car_number_charging_amps
-      - delay: "{{ wait_command_execute }}"
+      - service: number.set_value
+        data_template:
+          value: "{{ 0 }}"
+        target:
+          entity_id: !input car_number_charging_amps
+    else:
+      - service: ocpp.set_charge_rate
+        data:
+          custom_profile: |
+            {
+              "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+              "chargingProfileId": 1,
+              "stackLevel": 0,
+              "chargingProfilePurpose": "TxProfile",
+              "chargingProfileKind": "Relative",
+              "chargingSchedule": {
+                "chargingRateUnit": "A",
+                "chargingSchedulePeriod": [
+                  {"startPeriod": 0, "limit": {{ 0 }}}  
+                ]
+              }
+            }
+          conn_id: 1
+  - delay: "{{ wait_command_execute }}"
 
-      # Turn off charger.
+  # Turn off charger if it is on or charging
+  - if:
+      - condition: template
+        value_template: "{{ is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging') }}"
+    then:
       - service: switch.turn_off
         data: {}
         target:
           entity_id: !input car_switch_charger
       - delay: "{{ wait_charger_off }}"
-
-  # Set current to 5A on exit because charger is turned off on reaching charge limit and had no chance to set current to 0.
-  - service: number.set_value
-    data:
-      value: "{{ initial_charge_current }}"
-    target:
-      entity_id: !input car_number_charging_amps
-  - delay: "{{ wait_command_execute }}"
 
   # Get the latest data from Tesla to update HA before exiting script.
   - if:
