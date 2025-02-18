@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or Tesla API to charge EV from excess solar and weather forecast (v3.0beta1).
+    Use OCPP or Tesla API to charge EV from excess solar and weather forecast (v3.0beta2).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -322,6 +322,18 @@ blueprint:
           mode: slider
 
     #####################################
+    # OCPP configs
+    #####################################
+    ocpp_charger_name:
+      name: OCPP charger name
+      description: >
+        OCPP charger name.
+        Default: charger
+      default: "charger"
+      selector:
+        text:
+
+    #####################################
     # Tesla and OCPP common config entities
     #####################################
     car_sensor_charger_pluggedin:
@@ -359,7 +371,7 @@ blueprint:
       description: >
         Entity to control current in Ampere used to charge the car battery.
         This is the main parameter used to adjust electricity consumption.
-        (OCPP: number.charger_maximum_current)
+        (OCPP: sensor.charger_current_import  - read-only sensor)
       default: number.charging_amps
       selector:
         entity:
@@ -510,6 +522,9 @@ variables:
   # Power = Voltage * Current
   # The power step in watts to increase or decrease with 1A current change.
   oneAmpWattStep: "{{ carChargerVoltage * 1 }}"
+
+  ocppChargerName: !input ocpp_charger_name
+  ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
 
   #####################################
   # External entities
@@ -852,8 +867,8 @@ actions:
             # +ve => importing amp from grid, -ve => exporting amp to grid
             allCurrentNet: "{{ (allPowerNet / oneAmpWattStep) | float }}"
 
-            # Charge current for this sequence run, including sanity check to ensure within limits.
-            chargeCurrent: "{{ states(carChargingAmps) | int }}"
+            # Charge current for this sequence run, including sanity check to ensure within limits. OCPP has current with 1 decimal place.
+            chargeCurrent: "{{ states(carChargingAmps) | round(0) }}"
             carChargeCurrent: >
               {% if chargeCurrent < 0 %}
                 {{ 0 }}
@@ -907,6 +922,31 @@ actions:
                 # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
                 # Cannot get response_variable to work. Needs to be key/value pair?
                 #response_variable: "stop_charging_reason"
+
+          # If using OCPP. See OCPP https://github.com/taste66/ocpp/blob/patch-1/docs/Charge_automation.md
+          - conditions:
+              - alias: "If using OCPP"
+                condition: template
+                value_template: "{{ not useTeslaApi }}"
+            sequence:
+              - alias: "Then set current using OCPP"
+                service: ocpp.set_charge_rate     
+                data:
+                  custom_profile: |
+                    {
+                      "transactionId": {{ states(ocppChargerTransactionId) | int }},
+                      "chargingProfileId": 1,
+                      "stackLevel": 0,
+                      "chargingProfilePurpose": "TxProfile",
+                      "chargingProfileKind": "Relative",
+                      "chargingSchedule": {
+                        "chargingRateUnit": "A",
+                        "chargingSchedulePeriod": [
+                          {"startPeriod": 0, "limit": {{ newChargeCurrent }}}  
+                        ]
+                      }
+                    }
+                  conn_id: 1
 
           # Need to change charger current without stepping.
           - conditions:
