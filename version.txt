@@ -1,6 +1,11 @@
 EV Solar Charger
 ================
 
+v3.0beta3   19/2/2025
+-   OCPP entities automatically defined except sensor.charger_status_connector.
+-   Beta feature: Possible to directly control other EVs for charging provided HA addon for the EV is installed.
+-   Tidied code and doc.
+
 v3.0beta2   18/2/2025
 -   OCPP specific code to adjust car charging current.
 
