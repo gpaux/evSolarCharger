@@ -962,7 +962,11 @@ actions:
 
             # -ve to use from secondary power source, +ve to export to secondary power source.
             powerOffset: >
-              {{ states(e_powerOffsetFromZero) | int }
+              {% if has_value(e_powerOffsetFromZero) %}
+                {{ states(e_powerOffsetFromZero) | int }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
 
             # Net power from all sources (default 0 set by float(0) if cannot convert to float).
             allPowerNet: "{{ states(e_mainPowerNet) | float(0) + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
