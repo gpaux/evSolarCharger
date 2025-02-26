@@ -154,7 +154,7 @@ blueprint:
       description: >
         Sensor to specify offset in Watts for power flow to or from secondary power source at all times, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
         Set negative value to import from secondary power source, or positive value to export to secondary power source.
-        Default 0 watt.
+        Suggest to set to 0 Watt to charge from solar only.
       selector:
         entity:
 
