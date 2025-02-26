@@ -143,9 +143,8 @@ blueprint:
     toggle_secondary_power_source:
       name: Secondary power source toggle
       description: >
-        Toggle on to charge from secondary power source using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        This is usually used for night time charging.
-        Toggle off to charge from solar only.
+        Toggle on to charge from secondary power source at night using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Toggle off to charge from solar only during the day.
       selector:
         entity:
           domain: input_boolean
@@ -154,8 +153,8 @@ blueprint:
       name: Power offset for import from or export to secondary power source
       description: >
         Sensor to specify offset in Watts for power flow to or from secondary power source at all times, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
-        Set negative value to import from secondary power source, or positive value to export to secondary power source. Default 0 watt.
-        If secondary power source is toggled off with 0 watt power offset, ie. 0 power to or from secondary power source.
+        Set negative value to import from secondary power source, or positive value to export to secondary power source.
+        Default 0 watt.
       selector:
         entity:
 
@@ -954,12 +953,16 @@ actions:
               {% endif %}
 
             # -ve to use from secondary power source, +ve to export to secondary power source.
+            #powerOffset: >
+            #  {% if is_state(e_useSecondaryPowerSource, 'on') %}
+            #    {{ states(e_powerOffsetFromZero) | int }}
+            #  {% else %}
+            #    {{ 0 }}
+            #  {% endif %}
+
+            # -ve to use from secondary power source, +ve to export to secondary power source.
             powerOffset: >
-              {% if is_state(e_useSecondaryPowerSource, 'on') %}
-                {{ states(e_powerOffsetFromZero) | int }}
-              {% else %}
-                {{ 0 }}
-              {% endif %}
+              {{ states(e_powerOffsetFromZero) | int }
 
             # Net power from all sources (default 0 set by float(0) if cannot convert to float).
             allPowerNet: "{{ states(e_mainPowerNet) | float(0) + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
