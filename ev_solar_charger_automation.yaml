@@ -143,8 +143,9 @@ blueprint:
     toggle_secondary_power_source:
       name: Secondary power source toggle
       description: >
-        Toggle on to charge from solar and secondary power source using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        Default is to charge from solar only.
+        Toggle on to charge from secondary power source using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        This is usually used for night time charging.
+        Toggle off to charge from solar only.
       selector:
         entity:
           domain: input_boolean
@@ -152,9 +153,9 @@ blueprint:
     power_offset_from_zero:
       name: Power offset for import from or export to secondary power source
       description: >
-        Sensor to specify offset in Watts for power flow to or from secondary power source, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
-        Set negative value to import from secondary power source, or positive value to export to secondary power source.
-        If secondary power source is toggled off, the script will try to achieve power offset of 0 watt, ie. 0 power to or from secondary power source.
+        Sensor to specify offset in Watts for power flow to or from secondary power source at all times, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
+        Set negative value to import from secondary power source, or positive value to export to secondary power source. Default 0 watt.
+        If secondary power source is toggled off with 0 watt power offset, ie. 0 power to or from secondary power source.
       selector:
         entity:
 
