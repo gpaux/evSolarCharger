@@ -140,23 +140,23 @@ blueprint:
           unit_of_measurement: degree
           mode: box
 
-    toggle_secondary_power_source:
-      name: Secondary power source toggle for night time charging
-      description: >
-        Toggle on to charge from secondary power source at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        Toggle off to charge car during daytime only.
-      selector:
-        entity:
-          domain: input_boolean
-
     power_offset_from_zero:
-      name: Power offset for import from or export to secondary power source
+      name: Power offset for import from or export to secondary power source (eg. grid/battery)
       description: >
-        Sensor to specify offset in Watts for power flow to or from secondary power source at all times, eg. battery, grid (Settings > Devices & Services > Helpers > Create helper > Number or Template).
+        Sensor to specify offset in Watts for power flow to or from secondary power source at all times (Settings > Devices & Services > Helpers > Create helper > Number or Template).
         Set negative value to import from secondary power source, or positive value to export to secondary power source.
         Suggest to set to 0 Watt to charge from solar only.
       selector:
         entity:
+
+    toggle_secondary_power_source:
+      name: Secondary power source toggle for night time charging
+      description: >
+        Toggle on to charge from secondary power source (eg. grid/battery) at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Toggle off to charge car during daytime only.
+      selector:
+        entity:
+          domain: input_boolean
 
     toggle_stop_charger:
       name: Stop charger toggle

@@ -3,6 +3,7 @@ EV Solar Charger
 
 v3.0beta4   26/2/2025
 -   Breaking change: Power offset parameter not dependent on secondary power source.
+-   Updated doc.
 
 v3.0beta3   19/2/2025
 -   OCPP entities automatically defined except sensor.charger_status_connector.
