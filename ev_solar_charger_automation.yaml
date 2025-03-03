@@ -141,10 +141,10 @@ blueprint:
           mode: box
 
     toggle_secondary_power_source:
-      name: Secondary power source toggle
+      name: Secondary power source toggle for night time charging
       description: >
-        Toggle on to charge from secondary power source at night using power offset (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        Toggle off to charge from solar during daytime only.
+        Toggle on to charge from secondary power source at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Toggle off to charge car during daytime only.
       selector:
         entity:
           domain: input_boolean
