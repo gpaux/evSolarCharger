@@ -6,7 +6,7 @@
 #
 ###############################################################################
 # Objective:
-# - Use OCPP or Tesla API to charge EV from excess solar and weather forecast.
+# - Use OCPP or EV specific API to charge EV from excess solar and weather forecast.
 #
 # History:
 # 20/6/2023 Inspiration from Alphaemef's Tesla Solar Charger Blueprint 30/4/2023.
@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or Tesla API to charge EV from excess solar and weather forecast (v3.0beta4).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta5).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -72,15 +72,6 @@ blueprint:
           max: 100
           unit_of_measurement: amp
           mode: box
-
-    step_current_change:
-      name: Adjust charger current using step change
-      description: >
-        Adjust charger current using 1 Amp step change to gradually increase or decrease the current.
-        Otherwise current will be set directly with single API call without stepping.
-      default: true
-      selector:
-        boolean:
 
     power_draw_skew:
       name: Power draw skew
@@ -175,18 +166,19 @@ blueprint:
       description: >
         Set car charge limit configured for the day once on start up (Settings > Devices & Services > Helpers > Create helper > Toggle).
         If toggled off, the existing car charge limit will be used.
+        Note: Requires car battery level sensor for this to work. Please toggle off this option if car battery level sensor is not available.
       selector:
         entity:
           domain: input_boolean
 
     publish_car_charge_limit:
-      name: Publish car charge limit (required for OCPP only)
+      name: Publish car charge limit
       description: >
         Placeholder for car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
-        Value determined by script on start up if set daily car charge limit is toggled on, otherwise value must be set by user.
         The script will stop charging once this charge limit is reached.
-        Equal or higher charge limit must have already been set in EV.
-      default: number.not_defined
+        Value determined by script on start up if set daily car charge limit is toggled on, otherwise value should be set by user.
+        If charge limit setting is not available from EV specific API, equal or higher charge limit must be set in EV.
+        Note: Requires car battery level sensor for this to work, otherwise it will be ignored if car battery level sensor is not available.
       selector:
         entity:
           domain: input_number
@@ -344,13 +336,15 @@ blueprint:
         text:
 
     #####################################
-    # Tesla and OCPP common config entities
+    # Basic common control entities
     #####################################
     car_sensor_charger_pluggedin:
       name: Charger plugged in sensor
       description: >
         Sensor to check if car is plugged in. The correct sensor must be set here due to limitation of the Blueprint trigger.
-        (OCPP: sensor.charger_status_connector)
+        Default:  binary_sensor.charger
+          OCPP:   sensor.charger_status_connector
+          Tesla:  binary_sensor.charger
       default: binary_sensor.charger
       selector:
         entity:
@@ -360,7 +354,9 @@ blueprint:
       name: Charger on/off switch
       description: >
         Switch to turn charger on or off.
-        (OCPP: switch.charger_charge_control)
+        Default:  switch.charger
+          OCPP:   switch.charger_charge_control
+          Tesla:  switch.charger
       default: switch.charger
       selector:
         entity:
@@ -370,7 +366,9 @@ blueprint:
       name: Charger charging sensor
       description: >
         Sensor to check if car is charging.
-        (OCPP: sensor.charger_status_connector)
+        Default:  binary_sensor.charging
+          OCPP:   sensor.charger_status_connector
+          Tesla:  binary_sensor.charging
       default: binary_sensor.charging
       selector:
         entity:
@@ -381,62 +379,76 @@ blueprint:
       description: >
         Entity to control current in Ampere used to charge the car battery.
         This is the main parameter used to adjust electricity consumption.
-        (OCPP: sensor.charger_current_import  - read-only sensor)
+        Default:  number.charging_amps
+          OCPP:   sensor.charger_current_import (read-only)
+          Tesla:  number.charging_amps (read/write)
       default: number.charging_amps
       selector:
         entity:
           domain: number
 
+    #####################################
+    # EV specific control entities
+    #####################################
     car_sensor_battery:
-      name: EV battery state of charge sensor
+      name: EV battery level sensor
       description: >
-        Sensor that reports current battery charge level.
-        (OCPP: sensor.charger_soc)
+        Sensor that reports car battery charge level.
+        This can be EV specific sensor or OCPP sensor provided the appropiate HA integration is installed.
+        The OCPP charger implementation of this sensor might not be reliable.
+        If sensor is unreliable or not implemented by the API, then enter "sensor.ev_soc_undefined" to ignore this sensor, in which case set charge limit in car to control when to stop charging.
+        Default:  sensor.battery
+          OCPP:   sensor.charger_soc
+          Tesla:  sensor.battery
       default: sensor.battery
       selector:
         entity:
           domain: sensor
 
-    #####################################
-    # Tesla specific config entities
-    #####################################
-    use_ev_specific_api:
-      name: Use EV specific API
-      description: >
-        Toggle on to use EV specific API to control EV for charging. Tesla entities are set by default.
-      default: true
-      selector:
-        boolean:
-
     car_number_charge_limit:
-      name: Tesla charge limit
-      description: Entity to control car battery charge limit in percentage (100% = fully charged).
+      name: EV charge limit
+      description: >
+        Entity to control car battery charge limit in percentage (100% = fully charged).
+        EV specific integration must be installed.
+        Default:  number.charge_limit
+          Tesla:  number.charge_limit
       default: number.charge_limit
       selector:
         entity:
           domain: number
 
     car_location_tracker:
-      name: Tesla location tracker
+      name: EV location tracker
       description: >
         The entity that provides the location of car.
+        EV specific integration must be installed.
         Important that home location is defined in Home Assistant.
+        Default:  device_tracker.location_tracker
+          Tesla:  device_tracker.location_tracker
       default: device_tracker.location_tracker
       selector:
         entity:
           domain: device_tracker
 
     car_button_wake_up:
-      name: Tesla button wake up
-      description: Button to wake up car.
+      name: EV button wake up
+      description: >
+        Button to wake up car.
+        EV specific integration must be installed.
+        Default:  button.wake_up
+          Tesla:  button.wake_up
       default: button.wake_up
       selector:
         entity:
           domain: button
 
     car_button_forceupdate_ha:
-      name: Tesla button force update Home Assistant
-      description: Button to force update sensors in Home Assistant with values from car.
+      name: EV button force update Home Assistant
+      description: >
+        Button to force update sensors in Home Assistant with values from car.
+        EV specific integration must be installed.
+        Default:  button.force_data_update
+          Tesla:  button.force_data_update
       default: button.force_data_update
       selector:
         entity:
@@ -496,7 +508,6 @@ variables:
   # Must not use states() to access local variables
   carChargerVoltage: !input charger_voltage
   carChargerMaxCurrent: !input charger_max_current
-  isStepCurrentChange: !input step_current_change
 
   # The skew shifts the power export/import curve left or right defining the range where power can fluctuate without causing charger current adjustment. 
   # The higher the skew, the lesser the chance to import power and more likely to export power.
@@ -550,13 +561,12 @@ variables:
   input_carChargerSwitch: !input car_switch_charger
   input_isCarCharging: !input car_sensor_charging
   input_carChargingAmps: !input car_number_charging_amps
-  input_carBatteryLevel: !input car_sensor_battery
 
-  useEvSpecificApi: !input use_ev_specific_api
-  e_teslaCarChargeLimit: !input car_number_charge_limit
-  e_teslaCarLocation: !input car_location_tracker
-  e_teslaCarWakeUp: !input car_button_wake_up
-  e_teslaCarForceUpdateHa: !input car_button_forceupdate_ha
+  e_evCarBatteryLevel: !input car_sensor_battery
+  e_evCarChargeLimit: !input car_number_charge_limit
+  e_evCarLocation: !input car_location_tracker
+  e_evCarWakeUp: !input car_button_wake_up
+  e_evCarForceUpdateHa: !input car_button_forceupdate_ha
 
   #####################################
   # OCPP
@@ -595,12 +605,12 @@ variables:
       {{ input_carChargingAmps }}
     {% endif %}
 
-  e_carBatteryLevel: >
-    {% if useOcppApi %}
-      sensor.{{ ocppChargerName }}_soc
-    {% else %}
-      {{ input_carBatteryLevel }}
-    {% endif %}
+  #e_evCarBatteryLevel: >
+  #  {% if useOcppApi %}
+  #    sensor.{{ ocppChargerName }}_soc
+  #  {% else %}
+  #    {{ input_carBatteryLevel }}
+  #  {% endif %}
 
   #####################################
   # Set car charge limit based on which week day
@@ -666,8 +676,8 @@ conditions:
   # OCPP charger will know when it is plugged in at location.
   - condition: template
     value_template: >
-      {% if useEvSpecificApi %}
-        {{ is_state(e_teslaCarLocation, 'home') }}
+      {% if has_value(e_evCarLocation) %}
+        {{ is_state(e_evCarLocation, 'home') }}
       {% else %}
         {{ true }}
       {% endif %}
@@ -685,29 +695,33 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ useEvSpecificApi }}"
+        value_template: "{{ has_value(e_evCarWakeUp) }}"
     then:
       # Wake up Tesla.
       - service: button.press
         data: {}
         target:
-          entity_id: "{{ e_teslaCarWakeUp }}"
+          entity_id: "{{ e_evCarWakeUp }}"
       - delay: "{{ wait_car_wakeup }}"
 
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+    then:
       # Get the latest data from Tesla to update HA.
       - service: button.press
         data: {}
         target:
-          entity_id: "{{ e_teslaCarForceUpdateHa }}"
+          entity_id: "{{ e_evCarForceUpdateHa }}"
       - delay: "{{ wait_command_execute }}"
 
-      # Sanity check in case of manual run.
-      # Do not manually run this script if car is not at home, because it affects car charging anywhere.
-      - if:
-          - condition: template
-            value_template: "{{ states(e_teslaCarLocation) != 'home' }}"
-        then:
-          - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
+  # Sanity check in case of manual run.
+  # Do not manually run this script if car is not at home, because it affects car charging anywhere.
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarLocation) and states(e_evCarLocation) != 'home' }}"
+    then:
+      - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
 
   # Always set initial charge current here.  Otherwise if the charger is already on, it might not be set for sometime until there is a change.
   # The new charge current value will only be set if the old and new values are different. Confirmed in log.
@@ -830,34 +844,46 @@ actions:
             #level: warning
             level: info
 
+        # Set car charge limit if using EV specific API.
         - if:
             - condition: template
-              value_template: "{{ useOcppApi }}"
+              value_template: "{{ has_value(e_evCarChargeLimit) }}"
           then:
-            # Publish final car charge limit as global variable to be used later on in script.
-            - service: input_number.set_value
-              data_template:
-                entity_id: !input publish_car_charge_limit
-                value: "{{ finalCarChargeLimit }}"
-          else:
-            # Changing charge limit can turn on or off charger by car depending on whether charge limit has been reached or not.
+            # Changing charge limit can turn on or off Tesla charger by car depending on whether charge limit has been reached or not.
             - service: number.set_value
               data:
                 value: "{{ finalCarChargeLimit }}"
               target:
                 entity_id: !input car_number_charge_limit
-        - delay: "{{ wait_charge_limit }}"
+            - delay: "{{ wait_charge_limit }}"
+
+        # Publish final car charge limit as global variable to be used later on in script.
+        - service: input_number.set_value
+          data_template:
+            entity_id: !input publish_car_charge_limit
+            value: "{{ finalCarChargeLimit }}"
 
         - if:
             - condition: template
-              value_template: "{{ useEvSpecificApi }}"
+              value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
             # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
             - service: button.press
               data: {}
               target:
-                entity_id: "{{ e_teslaCarForceUpdateHa }}"
+                entity_id: "{{ e_evCarForceUpdateHa }}"
             - delay: "{{ wait_command_execute }}"
+
+    # Don't set daily car charge limit, so just copy charge limit from API if available. Otherwise publish_car_charge_limit must be set by user.
+    default:
+      - if:
+          - condition: template
+            value_template: "{{ has_value(e_evCarChargeLimit) }}"
+        then:
+          - service: input_number.set_value
+            data_template:
+              entity_id: !input publish_car_charge_limit
+              value: "{{ states(e_evCarChargeLimit) | int }}"
 
   #####################################
   # Main while loop
@@ -884,10 +910,10 @@ actions:
             - alias: "Continue if battery is below charge limit"
               condition: template
               value_template: >
-                {% if useOcppApi %}
-                  {{ (states(e_carBatteryLevel) | int) < (states(e_publishCarChargeLimit) | int) }}
+                {% if has_value(e_evCarBatteryLevel) %}
+                    {{ (states(e_evCarBatteryLevel) | int) < (states(e_publishCarChargeLimit) | int) }}
                 {% else %}
-                  {{ (states(e_carBatteryLevel) | int) < (states(e_teslaCarChargeLimit) | int) }}
+                    {{ true }}
                 {% endif %}
 
             - condition: or
@@ -926,12 +952,12 @@ actions:
                 # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
                 - if:
                     - condition: template
-                      value_template: "{{ useEvSpecificApi }}"
+                      value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
                   then:
                     - service: button.press
                       data: {}
                       target:
-                        entity_id: "{{ e_teslaCarForceUpdateHa }}"
+                        entity_id: "{{ e_evCarForceUpdateHa }}"
                     - delay: "{{ wait_command_execute }}"
 
         # For debug only
@@ -1018,12 +1044,12 @@ actions:
               # Get the latest data from Tesla to update HA before exiting script
               - if:
                   - condition: template
-                    value_template: "{{ useEvSpecificApi }}"
+                    value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
                 then:
                   - service: button.press
                     data: {}
                     target:
-                      entity_id: "{{ e_teslaCarForceUpdateHa }}"
+                      entity_id: "{{ e_evCarForceUpdateHa }}"
                   - delay: "{{ wait_command_execute }}"
 
               - stop: "Exiting script due to charger turned off manually or automatically by car when charge limit reached."
@@ -1031,11 +1057,11 @@ actions:
                 # Cannot get response_variable to work. Needs to be key/value pair?
                 #response_variable: "stop_charging_reason"
 
-          # If using OCPP. See OCPP https://github.com/taste66/ocpp/blob/patch-1/docs/Charge_automation.md
+          # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
           - conditions:
-              - alias: "If using OCPP"
+              - alias: "If using OCPP to change charging current"
                 condition: template
-                value_template: "{{ useOcppApi }}"
+                value_template: "{{ useOcppApi and newChargeCurrent != carChargeCurrent }}"
             sequence:
               - alias: "Then set current using OCPP"
                 service: ocpp.set_charge_rate     
@@ -1056,11 +1082,11 @@ actions:
                     }
                   conn_id: 1
 
-          # Need to change charger current without stepping.
+          # If using EV specific API.
           - conditions:
-              - alias: "If need to change charge current without stepping"
+              - alias: "If using EV specific API to change charging current"
                 condition: template
-                value_template: "{{ not isStepCurrentChange and newChargeCurrent != carChargeCurrent }}"
+                value_template: "{{ not useOcppApi and newChargeCurrent != carChargeCurrent }}"
             sequence:
               - alias: "Then change charger current without stepping"
                 service: number.set_value
@@ -1068,40 +1094,6 @@ actions:
                   value: "{{ newChargeCurrent }}"
                 target:
                   entity_id: "{{ e_carChargingAmps }}"
-
-          # Need to increase charger current.
-          - conditions:
-              - alias: "If need to increase charge current"
-                condition: template
-                value_template: "{{ newChargeCurrent > carChargeCurrent }}"
-            sequence:
-              - alias: "Then increase charger current with 1A step"
-                repeat:
-                  while: "{{ (carChargeCurrent + repeat.index) <= newChargeCurrent }}"
-                  sequence:
-                    - service: number.set_value
-                      data_template:
-                        value: "{{ carChargeCurrent + repeat.index }}"
-                      target:
-                        entity_id: "{{ e_carChargingAmps }}"
-                    - delay: "{{ wait_current_change }}"
-
-          # Need to decrease charger current.
-          - conditions:
-              - alias: "If need to decrease charge current"
-                condition: template
-                value_template: "{{ newChargeCurrent < carChargeCurrent }}"
-            sequence:
-              - alias: "Then decrease charger current with 1A step"
-                repeat:
-                  while: "{{ (carChargeCurrent - repeat.index) >= newChargeCurrent }}"
-                  sequence:
-                    - service: number.set_value
-                      data_template:
-                        value: "{{ carChargeCurrent - repeat.index }}"
-                      target:
-                        entity_id: "{{ e_carChargingAmps }}"
-                    - delay: "{{ wait_current_change }}"
 
           # Do nothing.
           - conditions:
@@ -1128,12 +1120,12 @@ actions:
         # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
         - if:
             - condition: template
-              value_template: "{{ useEvSpecificApi }}"
+              value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
             - service: button.press
               data: {}
               target:
-                entity_id: "{{ e_teslaCarForceUpdateHa }}"
+                entity_id: "{{ e_evCarForceUpdateHa }}"
             - delay: "{{ wait_command_execute }}"
 
   #####################################
@@ -1183,10 +1175,10 @@ actions:
   # Get the latest data from Tesla to update HA before exiting script.
   - if:
       - condition: template
-        value_template: "{{ useEvSpecificApi }}"
+        value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
     then:
       - service: button.press
         data: {}
         target:
-          entity_id: "{{ e_teslaCarForceUpdateHa }}"
+          entity_id: "{{ e_evCarForceUpdateHa }}"
       - delay: "{{ wait_command_execute }}"

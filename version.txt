@@ -1,6 +1,14 @@
 EV Solar Charger
 ================
 
+v3.0beta5   4/3/2025
+-   Breaking change: Removed stepping current change, assuming gradual current increase or decrease is handled by charger.
+-   Input number "Publish car charge limit" must be defined.
+-   EV specific APIs are now optional, ie. charge limit, battery level, location, car wake up and force update HA.
+-   Should support different EVs using EV specific HA integration.
+-   Should support different EVs using OCPP and EV specific HA integration.
+-   Should support different EVs using OCPP without EV specific HA integration (requires charge limit set in car).
+
 v3.0beta4   26/2/2025
 -   Breaking change: Power offset parameter not dependent on secondary power source.
 -   Updated doc.
