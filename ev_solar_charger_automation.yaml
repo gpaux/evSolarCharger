@@ -935,36 +935,37 @@ actions:
                         entity_id: "{{ e_evCarForceUpdateHa }}"
                     - delay: "{{ wait_command_execute }}"
 
-                # Always set initial charge current here after turning on charger.
-                # The new charge current value will only be set if the old and new values are different. Confirmed in log.
-                - if:
-                    - condition: template
-                      value_template: "{{ useOcppApi }}"
-                  then:
-                    - service: ocpp.set_charge_rate     
-                      data:
-                        custom_profile: |
-                          {
-                            "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
-                            "chargingProfileId": 1,
-                            "stackLevel": 0,
-                            "chargingProfilePurpose": "TxProfile",
-                            "chargingProfileKind": "Relative",
-                            "chargingSchedule": {
-                              "chargingRateUnit": "A",
-                              "chargingSchedulePeriod": [
-                                {"startPeriod": 0, "limit": {{ initial_charge_current }}}  
-                              ]
-                            }
-                          }
-                        conn_id: 1
-                  else:
-                    - service: number.set_value
-                      data:
-                        value: "{{ initial_charge_current }}"
-                      target:
-                        entity_id: "{{ e_carChargingAmps }}"
-                - delay: "{{ wait_command_execute }}"
+            # Always set initial charge current here after turning on charger.
+            # The new charge current value will only be set if the old and new values are different. Confirmed in log.
+            - alias: "And set initial charge current"
+              if:
+                - condition: template
+                  value_template: "{{ useOcppApi }}"
+              then:
+                - service: ocpp.set_charge_rate     
+                  data:
+                    custom_profile: |
+                      {
+                        "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+                        "chargingProfileId": 1,
+                        "stackLevel": 0,
+                        "chargingProfilePurpose": "TxProfile",
+                        "chargingProfileKind": "Relative",
+                        "chargingSchedule": {
+                          "chargingRateUnit": "A",
+                          "chargingSchedulePeriod": [
+                            {"startPeriod": 0, "limit": {{ initial_charge_current }}}  
+                          ]
+                        }
+                      }
+                    conn_id: 1
+              else:
+                - service: number.set_value
+                  data:
+                    value: "{{ initial_charge_current }}"
+                  target:
+                    entity_id: "{{ e_carChargingAmps }}"
+            - delay: "{{ wait_command_execute }}"
 
         # For debug only
         #- service: system_log.write
