@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta6).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta7).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -924,17 +924,6 @@ actions:
                     entity_id: "{{ e_carChargerSwitch }}"
                 - delay: "{{ wait_charger_on }}"
 
-                # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
-                - if:
-                    - condition: template
-                      value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
-                  then:
-                    - service: button.press
-                      data: {}
-                      target:
-                        entity_id: "{{ e_evCarForceUpdateHa }}"
-                    - delay: "{{ wait_command_execute }}"
-
             # Always set initial charge current here after turning on charger.
             # The new charge current value will only be set if the old and new values are different. Confirmed in log.
             - alias: "And set initial charge current"
@@ -965,7 +954,18 @@ actions:
                     value: "{{ initial_charge_current }}"
                   target:
                     entity_id: "{{ e_carChargingAmps }}"
-            - delay: "{{ wait_command_execute }}"
+            - delay: "{{ wait_charger_on }}"
+
+            # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
+            - if:
+                - condition: template
+                  value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+              then:
+                - service: button.press
+                  data: {}
+                  target:
+                    entity_id: "{{ e_evCarForceUpdateHa }}"
+                - delay: "{{ wait_command_execute }}"
 
         # For debug only
         #- service: system_log.write

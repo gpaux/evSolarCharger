@@ -1,6 +1,9 @@
 EV Solar Charger
 ================
 
+v3.0beta7   5/3/2025
+-   Added 27 seconds delay after switching on charger.
+
 v3.0beta6   4/3/2025
 -   Fixed default switch.charger_charge_control name.
 -   Implemented OCPP v1.6j ChargePointStatus values.
