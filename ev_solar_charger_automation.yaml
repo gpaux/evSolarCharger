@@ -659,9 +659,9 @@ triggers:
 
   # Trigger action if just plugged in.
   # See OCPP spec v1.6j ChargePointStatus on page 77.
-  # Available (no EV connected), 
-  # Preparing (EV plugged in but not yet charging), 
-  # Charging (active charging session), 
+  # Available (no EV connected)
+  # Preparing (EV plugged in but not yet charging)
+  # Charging (active charging session)
   # Finishing (charging session ending)
   - platform: state
     entity_id:
