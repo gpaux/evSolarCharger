@@ -8,6 +8,8 @@ v3.0beta5   4/3/2025
 -   Should support different EVs using EV specific HA integration.
 -   Should support different EVs using OCPP and EV specific HA integration.
 -   Should support different EVs using OCPP without EV specific HA integration (requires charge limit set in car).
+-   Set initial charge current after turning on charger.
+-   Set 0 current before turning off charger.
 
 v3.0beta4   26/2/2025
 -   Breaking change: Power offset parameter not dependent on secondary power source.
