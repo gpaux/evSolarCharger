@@ -72,7 +72,7 @@ Device: Envoy [YourEnvoyId]
 -	Create following helpers, eg.
 Settings > Devices & Services > Helpers > Create Helper >
 1.	Toggle: MyEV set daily car charge limit
-2.  Number: MyEV publish car charge limit (required for OCPP only)
+2.  Number: MyEV publish car charge limit
 3.	Toggle: MyEV secondary power source
 4.  Number: MyEV charger minimum current
 5.	Number or template sensor: MyEV power offset (required when charging from secondary power source)
@@ -99,7 +99,7 @@ To charge from excess solar, just plug in the charger.  The initial charge curre
 
 Option 2
 --------
-To charge from secondary power source and solar, toggle on secondary power source and set power offset to draw power from secondary source.
+To charge from secondary power source and solar, set amount of power offset to draw from secondary power source.  Also need to toggle on secondary power source if charging at night.
 
 
 Notes
