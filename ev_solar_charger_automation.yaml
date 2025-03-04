@@ -1090,12 +1090,13 @@ actions:
                   conn_id: 1
 
           # If using EV specific API.
+          # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
           - conditions:
               - alias: "If using EV specific API to change charging current"
                 condition: template
                 value_template: "{{ not useOcppApi and newChargeCurrent != carChargeCurrent }}"
             sequence:
-              - alias: "Then change charger current without stepping"
+              - alias: "Then set current using EV specific API"
                 service: number.set_value
                 data_template:
                   value: "{{ newChargeCurrent }}"
