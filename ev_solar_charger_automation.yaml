@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta5).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta6).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -586,7 +586,7 @@ variables:
 
   e_carChargerSwitch: >
     {% if useOcppApi %}
-      sensor.{{ ocppChargerName }}_charge_control
+      switch.{{ ocppChargerName }}_charge_control
     {% else %}
       {{ input_carChargerSwitch }}
     {% endif %}
@@ -658,12 +658,17 @@ variables:
 triggers:
 
   # Trigger action if just plugged in.
+  # See OCPP spec v1.6j ChargePointStatus on page 77.
+  # Available (no EV connected), 
+  # Preparing (EV plugged in but not yet charging), 
+  # Charging (active charging session), 
+  # Finishing (charging session ending)
   - platform: state
     entity_id:
       - !input car_sensor_charger_pluggedin
     to:
       - "on"
-      - "Available"
+      - "Preparing"
 
   # Trigger action at elevation after sunrise.
   - trigger: numeric_state
@@ -686,7 +691,8 @@ conditions:
     entity_id: !input car_sensor_charger_pluggedin
     state:
       - "on"
-      - "Available"
+      - "Preparing"
+      - "Finishing"
 
 ###############################################################################
 # Actions
@@ -873,7 +879,7 @@ actions:
               entity_id: !input car_sensor_charger_pluggedin
               state:
                 - "on"
-                - "Available"
+                - "Preparing"
                 - "Charging"
 
             - alias: "Continue if battery is below charge limit"

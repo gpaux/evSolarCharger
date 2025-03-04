@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta6   4/3/2025
+-   Fixed default switch.charger_charge_control name.
+-   Implemented OCPP v1.6j ChargePointStatus values.
+
 v3.0beta5   4/3/2025
 -   Breaking change: Removed stepping current change, assuming gradual current increase or decrease is handled by charger.
 -   Input number "Publish car charge limit" must be defined.
