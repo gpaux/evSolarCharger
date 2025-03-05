@@ -1,6 +1,9 @@
 EV Solar Charger
 ================
 
+v3.0beta9   5/3/2025
+-   Updated Blueprint description doc.
+
 v3.0beta8   5/3/2025
 -   Ignore publish charge limit helper if not defined.
 -   Updated Blueprint description doc.

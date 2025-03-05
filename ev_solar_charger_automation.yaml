@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta8).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta9).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -43,7 +43,7 @@ blueprint:
       description: >
         Specify charger voltage in Volt.
         In Australia, single phase is 230V, and three phase is 400V due to 120 degree phase angle between phases.
-        See https://github.com/flashg1/TeslaSolarCharger/issues/18
+        See [here](https://github.com/flashg1/TeslaSolarCharger/issues/18) for setting voltage for 3 phase charger.
       default: 230
       selector:
         number:
@@ -109,7 +109,7 @@ blueprint:
       name: Sunrise elevation start trigger
       description: >
         Specify elevation to start charging relative to sunrise.
-        See https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition for details.
+        See [here](https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition) for details.
           * The default is to start when sun is 6 degrees above horizon after sunrise.
       default: 6
       selector:
@@ -123,8 +123,8 @@ blueprint:
       name: Sunset elevation end trigger
       description: >
         Specify elevation to stop charging relative to sunset.
-        Default is to end when sun is 6 degrees above the horizon before sunset.
-        See https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition for details.
+        See [here](https://www.home-assistant.io/docs/scripts/conditions/#sun-elevation-condition) for details.
+          * The default is to end when sun is 6 degrees above the horizon before sunset.
       default: 6
       selector:
         number:
@@ -174,7 +174,9 @@ blueprint:
       description: >
         Set car charge limit configured for the day once on start up (Settings > Devices & Services > Helpers > Create helper > Toggle).
         If toggled off, the existing car charge limit will be used.
-          * Note: Requires car battery level sensor for this to work. Please toggle off this option if car battery level sensor is not available.
+
+
+        Note: Requires car battery level sensor for this to work. Please toggle off this option if car battery level sensor is not available.
           * The default is off if not defined.
       default: boolean.not_defined
       selector:
@@ -186,9 +188,11 @@ blueprint:
       description: >
         Placeholder for car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
         The script will stop charging once this charge limit is reached.
-        Value determined by script on start up if set daily car charge limit is toggled on, otherwise value need to be set by user or EV specific API if available.
+        Value is determined by script on start up if set daily car charge limit is toggled on, otherwise value need to be set by user or EV specific API if available.
         If EV specific API does not support setting charge limit, user will need to set charge limit in both EV and script.
-          * Note: Requires car battery level sensor for this to work, otherwise script charge limit is ignored and EV charge limit will control when to stop charging.
+
+
+        Note: Requires car battery level sensor for this to work, otherwise this published charge limit is ignored, and charge limit set in EV will control when to stop charging.
           * The default is to ignore script car charge limit if not defined.
       default: number.not_defined
       selector:
@@ -307,7 +311,7 @@ blueprint:
       name: Weather condition field name
       description: >
         Field name for forecast attribute (default="condition").
-        See https://www.home-assistant.io/integrations/weather/ for details.
+        See [here](https://www.home-assistant.io/integrations/weather/) for details.
       default: "condition"
       selector:
         text:
