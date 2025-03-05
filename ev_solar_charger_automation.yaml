@@ -193,7 +193,7 @@ blueprint:
 
 
         Note: Requires car battery level sensor for this to work, otherwise this published charge limit is ignored, and charge limit set in EV will control when to stop charging.
-          * The default is to ignore script car charge limit if not defined.
+          * The default is to ignore this published charge limit if not defined.
       default: number.not_defined
       selector:
         entity:
