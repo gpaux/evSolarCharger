@@ -84,7 +84,7 @@ blueprint:
           * Where P = Charger voltage * 1 Amp
         
         Eg. Charger voltage = 230V, Skew = 0.3 => Lower range = -184W, Upper range = +46W
-          * Default = 0.3
+          * Default:  0.3
       default: 0.3
       selector:
         number:
@@ -97,6 +97,7 @@ blueprint:
       description: >
         Specify in seconds how often to check "sensor_main_power_net".
         The waiting period should be equal to the sensor update interval.
+          * Default:  60
       default: 60
       selector:
         number:
@@ -290,7 +291,9 @@ blueprint:
 
     weather_provider:
       name: Weather provider
-      description: Weather forecast provider, eg. Meteorologisk institutt (Met.no).
+      description: >
+        Weather forecast provider, eg. Meteorologisk institutt (Met.no).
+          * Default:  weather.forecast_home
       default: weather.forecast_home
       selector:
         entity:
@@ -310,8 +313,9 @@ blueprint:
     forecast_attribute:
       name: Weather condition field name
       description: >
-        Field name for forecast attribute (default="condition").
+        Field name for forecast attribute.
         See [here](https://www.home-assistant.io/integrations/weather/) for details.
+          * Default:  condition
       default: "condition"
       selector:
         text:
