@@ -137,7 +137,7 @@ blueprint:
     power_offset_from_zero:
       name: Power offset for import from or export to secondary power source (eg. grid/battery)
       description: >
-        Sensor to specify offset in Watts for power flow to or from secondary power source at all times (Settings > Devices & Services > Helpers > Create helper > Number or Template).
+        Sensor to specify maximum power flow to or from secondary power source at all times (Settings > Devices & Services > Helpers > Create helper > Number or Template).
         Set negative value to import from secondary power source, or positive value to export to secondary power source.
         Suggest to set to 0 Watt to charge from solar only.
           * The default is 0W if not defined.
