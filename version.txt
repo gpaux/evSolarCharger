@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta11  6/3/2025
+-   Define all OCPP entities automatically.
+-   Tidied code.
+
 v3.0beta10  6/3/2025
 -   EV specific API charge limit (evCarChargeLimit) takes precedent over published charge limit (publishCarChargeLimit).
 

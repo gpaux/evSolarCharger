@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta10).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta11).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -361,7 +361,7 @@ blueprint:
     car_sensor_charger_pluggedin:
       name: Charger plugged in sensor
       description: >
-        Sensor to check if car is plugged in. ***The correct sensor must be set here due to limitation of the Blueprint trigger.***
+        Sensor to check if car is plugged in. This entity is automatically defined if using OCPP API.
           * Default:  binary_sensor.charger
           * OCPP:     sensor.charger_status_connector
           * Tesla:    binary_sensor.charger
@@ -373,7 +373,7 @@ blueprint:
     car_switch_charger:
       name: Charger on/off switch
       description: >
-        Switch to turn charger on or off. This is set automatically if using OCPP API.
+        Switch to turn charger on or off. This entity is automatically defined if using OCPP API.
           * Default:  switch.charger
           * OCPP:     switch.charger_charge_control
           * Tesla:    switch.charger
@@ -385,7 +385,7 @@ blueprint:
     car_sensor_charging:
       name: Charger charging sensor
       description: >
-        Sensor to check if car is charging. This is set automatically if using OCPP API.
+        Sensor to check if car is charging. This entity is automatically defined if using OCPP API.
           * Default:  binary_sensor.charging
           * OCPP:     sensor.charger_status_connector
           * Tesla:    binary_sensor.charging
@@ -397,7 +397,7 @@ blueprint:
     car_number_charging_amps:
       name: Charger current
       description: >
-        Entity to control current in Ampere used to charge the car battery. This is set automatically if using OCPP API.
+        Entity to control current in Ampere used to charge the car battery. This entity is automatically defined if using OCPP API.
           * Default:  number.charging_amps
           * OCPP:     sensor.charger_current_import (read-only)
           * Tesla:    number.charging_amps (read/write)
@@ -662,32 +662,39 @@ variables:
 # Note:
 # - Tesla triggers do not update often due to infrequent polling.
 ###############################################################################
-# entity_id doesn't support templates, so no way to get this to work.
-#trigger_variables:
-#  useOcppApi: !input use_ocpp_api
-#  ocppChargerName: !input ocpp_charger_name
-#  input_carChargerPluggedIn: !input car_sensor_charger_pluggedin
-#  e_carChargerPluggedIn: >
-#    {% if useOcppApi %}
-#      sensor.{{ ocppChargerName }}_status_connector
-#    {% else %}
-#      {{ input_carChargerPluggedIn }}
-#    {% endif %}
+# Trigger variables must be defined here because triggers do not have access to global variables at time of trigger.
+trigger_variables:
+  useOcppApi: !input use_ocpp_api
+  ocppChargerName: !input ocpp_charger_name
+  input_carChargerPluggedIn: !input car_sensor_charger_pluggedin
+  e_carChargerPluggedIn: >
+    {% if useOcppApi %}
+      sensor.{{ ocppChargerName }}_status_connector
+    {% else %}
+      {{ input_carChargerPluggedIn }}
+    {% endif %}
 
 triggers:
 
-  # Trigger action if just plugged in.
+  # State entity_id can only work with !input syntax, ie. cannot be a variable!!!
+  #- platform: state
+  #  entity_id:
+  #    - !input car_sensor_charger_pluggedin
+  #  to:
+  #    - "on"
+  #    - "Preparing"
+
   # See OCPP spec v1.6j ChargePointStatus on page 77.
   # Available (no EV connected)
   # Preparing (EV plugged in but not yet charging)
   # Charging (active charging session)
   # Finishing (charging session ending)
-  - platform: state
-    entity_id:
-      - !input car_sensor_charger_pluggedin
-    to:
-      - "on"
-      - "Preparing"
+
+  # Trigger action if just plugged in.
+  # Use this for OCPP trigger testing,
+  #  value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Available'] }}"
+  - trigger: template
+    value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing'] }}"
 
   # Trigger action at elevation after sunrise.
   - trigger: numeric_state
@@ -697,7 +704,7 @@ triggers:
 
 conditions:
 
-  # OCPP charger will know when it is plugged in at location.
+  # Car must be at location. OCPP charger will know when it is plugged in at location.
   - condition: template
     value_template: >
       {% if has_value(e_evCarLocation) %}
@@ -706,12 +713,19 @@ conditions:
         {{ true }}
       {% endif %}
 
-  - condition: state
-    entity_id: !input car_sensor_charger_pluggedin
-    state:
-      - "on"
-      - "Preparing"
-      - "Finishing"
+  # State entity_id can only work with !input syntax, ie. cannot be a variable!!!
+  #- condition: state
+  #  entity_id: !input car_sensor_charger_pluggedin
+  #  state:
+  #    - "on"
+  #    - "Preparing"
+  #    - "Finishing"
+
+  # Charger must be plugged in.
+  # Use this for OCPP trigger testing,
+  #  value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Finishing', 'Available'] }}"
+  - condition: template
+    value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Finishing'] }}"
 
 ###############################################################################
 # Actions
@@ -780,7 +794,7 @@ actions:
             - alias: "Then get weather forecast data"
               service: weather.get_forecasts
               target:
-                entity_id: !input weather_provider
+                entity_id: "{{ e_weatherProvider }}"
               data:
                 type: "{{ forecastInterval }}"
               response_variable: weather_forecast
@@ -848,7 +862,7 @@ actions:
               data:
                 value: "{{ finalCarChargeLimit }}"
               target:
-                entity_id: !input car_number_charge_limit
+                entity_id: "{{ e_evCarChargeLimit }}"
             - delay: "{{ wait_charge_limit }}"
 
         # Publish final car charge limit as global variable to be used later on in script.
@@ -858,7 +872,7 @@ actions:
           then:
             - service: input_number.set_value
               data_template:
-                entity_id: !input publish_car_charge_limit
+                entity_id: "{{ e_publishCarChargeLimit }}"
                 value: "{{ finalCarChargeLimit }}"
 
         - if:
@@ -880,7 +894,7 @@ actions:
         then:
           - service: input_number.set_value
             data_template:
-              entity_id: !input publish_car_charge_limit
+              entity_id: "{{ e_publishCarChargeLimit }}"
               value: "{{ states(e_evCarChargeLimit) | int }}"
 
   #####################################
@@ -902,15 +916,29 @@ actions:
                   {{ true }}
                 {% endif %}
 
+            # State entity_id can only work with !input syntax, ie. cannot be a variable!!! Otherwise will get this error.
+            #
+            # Blueprint 'EV solar charger automation' generated invalid automation with inputs {'sensor_main_power_net': 'input_number.test_power_net', 
+            # 'publish_car_charge_limit': 'number.not_defined', 'car_button_forceupdate_ha': 'sensor.not_defined', 'car_button_wake_up': 'sensor.not_defined', 
+            # 'car_location_tracker': 'sensor.not_defined', 'car_number_charge_limit': 'sensor.not_defined', 'car_sensor_battery': 'sensor.not_defined', 
+            # 'use_ocpp_api': True, 'car_sensor_charger_pluggedin': 'sensor.charger_status_connector'}: 
+            # Entity {{ e_carChargerPluggedIn }} is neither a valid entity ID nor a valid UUID for 
+            # dictionary value @ data['actions'][4]['repeat']['while'][0]['conditions'][1]['entity_id']. Got '{{ e_carChargerPluggedIn }}'
+
+            # Should remove "Available" in production code, left here for IAMMeter testing only.
+            #- alias: "Continue if charger is plugged in"
+            #  condition: state
+            #  entity_id: !input car_sensor_charger_pluggedin
+            #  state:
+            #    - "on"
+            #    - "Preparing"
+            #    - "Charging"
+            #    - "Available"
+
             # Should remove "Available" in production code, left here for IAMMeter testing only.
             - alias: "Continue if charger is plugged in"
-              condition: state
-              entity_id: !input car_sensor_charger_pluggedin
-              state:
-                - "on"
-                - "Preparing"
-                - "Charging"
-                - "Available"
+              condition: template
+              value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Charging', 'Available'] }}"
 
             - alias: "Continue if battery is below charge limit"
               condition: template
