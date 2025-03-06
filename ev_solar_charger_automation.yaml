@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta9).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta10).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -188,9 +188,9 @@ blueprint:
       name: Publish car charge limit
       description: >
         Placeholder for car charge limit (Settings > Devices & Services > Helpers > Create helper > Number).
+        This is only required if EV specific API to set charge limit is not supported, in which case user will need to set charge limit in EV and here.
         The script will stop charging once this charge limit is reached.
-        Value is determined by script on start up if set daily car charge limit is toggled on, otherwise value need to be set by user or EV specific API if available.
-        If EV specific API does not support setting charge limit, user will need to set charge limit in both EV and script.
+        Value is determined by script on start up if set daily car charge limit is toggled on, otherwise value need to be set by user.
 
 
         Note: Requires car battery level sensor for this to work, otherwise this published charge limit is ignored, and charge limit set in EV will control when to stop charging.
@@ -915,8 +915,13 @@ actions:
             - alias: "Continue if battery is below charge limit"
               condition: template
               value_template: >
-                {% if has_value(e_evCarBatteryLevel) and has_value(e_publishCarChargeLimit) %}
-                    {{ (states(e_evCarBatteryLevel) | int) < (states(e_publishCarChargeLimit) | int) }}
+                {% if has_value(e_evCarBatteryLevel) and (has_value(e_evCarChargeLimit) or has_value(e_publishCarChargeLimit)) %}
+                    {% if has_value(e_evCarChargeLimit) %}
+                      {% set evChargeLimit = states(e_evCarChargeLimit) | int %}
+                    {% else %}
+                      {% set evChargeLimit = states(e_publishCarChargeLimit) | int %}
+                    {% endif %}
+                    {{ (states(e_evCarBatteryLevel) | int) < evChargeLimit }}
                 {% else %}
                     {{ true }}
                 {% endif %}
