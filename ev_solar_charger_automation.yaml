@@ -692,9 +692,9 @@ triggers:
 
   # Trigger action if just plugged in.
   # Use this for OCPP trigger testing,
-  #  value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Available'] }}"
+  #  value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'available'] }}"
   - trigger: template
-    value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing'] }}"
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing'] }}"
 
   # Trigger action at elevation after sunrise.
   - trigger: numeric_state
@@ -723,9 +723,9 @@ conditions:
 
   # Charger must be plugged in.
   # Use this for OCPP trigger testing,
-  #  value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Finishing', 'Available'] }}"
+  #  value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'finishing', 'available'] }}"
   - condition: template
-    value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Finishing'] }}"
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'finishing'] }}"
 
 ###############################################################################
 # Actions
@@ -938,7 +938,7 @@ actions:
             # Should remove "Available" in production code, left here for IAMMeter testing only.
             - alias: "Continue if charger is plugged in"
               condition: template
-              value_template: "{{ states(e_carChargerPluggedIn) in ['on', 'Preparing', 'Charging', 'Available'] }}"
+              value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'charging', 'available'] }}"
 
             - alias: "Continue if battery is below charge limit"
               condition: template
@@ -978,7 +978,7 @@ actions:
             - alias: "Then turn on charger if not already on"
               if:
                 - condition: template
-                  value_template: "{{ not (is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging')) }}"
+                  value_template: "{{ not states(e_isCarCharging) | lower in ['on', 'charging'] }}"
               then:
                 # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
                 - action: switch.turn_on
@@ -1107,7 +1107,7 @@ actions:
           - conditions:
               - alias: "Exit script if charger is turned off"
                 condition: template
-                value_template: "{{ not (is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging')) }}"
+                value_template: "{{ not states(e_isCarCharging) | lower in ['on', 'charging'] }}"
 
             sequence:
               # Get the latest data from Tesla to update HA before exiting script
@@ -1204,7 +1204,7 @@ actions:
   # Set 0 charging current and turn off charger if it is on or charging
   - if:
       - condition: template
-        value_template: "{{ is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging') }}"
+        value_template: "{{ states(e_isCarCharging) | lower in ['on', 'charging'] }}"
     then:
       # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
       - if:

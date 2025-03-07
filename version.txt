@@ -3,6 +3,7 @@ EV Solar Charger
 
 v3.0beta12  8/3/2025
 -   Poll integration once to get latest update after switching on charger.
+-   Use case insensitive comparison for OCPP charger status.
 
 v3.0beta11  6/3/2025
 -   Define all OCPP entities automatically.
