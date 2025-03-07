@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta11).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta12).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -737,7 +737,7 @@ actions:
         value_template: "{{ has_value(e_evCarWakeUp) }}"
     then:
       # Wake up Tesla.
-      - service: button.press
+      - action: button.press
         data: {}
         target:
           entity_id: "{{ e_evCarWakeUp }}"
@@ -748,7 +748,7 @@ actions:
         value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
     then:
       # Get the latest data from Tesla to update HA.
-      - service: button.press
+      - action: button.press
         data: {}
         target:
           entity_id: "{{ e_evCarForceUpdateHa }}"
@@ -842,7 +842,7 @@ actions:
               {% endif %}
 
         # Show current status
-        - service: system_log.write
+        - action: system_log.write
           data_template:
             message: |-
               {{now()}}: 
@@ -858,7 +858,7 @@ actions:
             - condition: template
               value_template: "{{ has_value(e_evCarChargeLimit) }}"
           then:
-            - service: number.set_value
+            - action: number.set_value
               data:
                 value: "{{ finalCarChargeLimit }}"
               target:
@@ -870,7 +870,7 @@ actions:
             - condition: template
               value_template: "{{ has_value(e_publishCarChargeLimit) }}"
           then:
-            - service: input_number.set_value
+            - action: input_number.set_value
               data_template:
                 entity_id: "{{ e_publishCarChargeLimit }}"
                 value: "{{ finalCarChargeLimit }}"
@@ -880,7 +880,7 @@ actions:
               value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
             # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
-            - service: button.press
+            - action: button.press
               data: {}
               target:
                 entity_id: "{{ e_evCarForceUpdateHa }}"
@@ -892,7 +892,7 @@ actions:
           - condition: template
             value_template: "{{ has_value(e_evCarChargeLimit) and has_value(e_publishCarChargeLimit) }}"
         then:
-          - service: input_number.set_value
+          - action: input_number.set_value
             data_template:
               entity_id: "{{ e_publishCarChargeLimit }}"
               value: "{{ states(e_evCarChargeLimit) | int }}"
@@ -981,7 +981,7 @@ actions:
                   value_template: "{{ not (is_state(e_isCarCharging, 'on') or is_state(e_isCarCharging, 'Charging')) }}"
               then:
                 # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
-                - service: switch.turn_on
+                - action: switch.turn_on
                   data: {}
                   target:
                     entity_id: "{{ e_carChargerSwitch }}"
@@ -994,7 +994,7 @@ actions:
                 - condition: template
                   value_template: "{{ useOcppApi }}"
               then:
-                - service: ocpp.set_charge_rate     
+                - action: ocpp.set_charge_rate     
                   data:
                     custom_profile: |
                       {
@@ -1012,7 +1012,7 @@ actions:
                       }
                     conn_id: 1
               else:
-                - service: number.set_value
+                - action: number.set_value
                   data:
                     value: "{{ initial_charge_current }}"
                   target:
@@ -1020,18 +1020,25 @@ actions:
             - delay: "{{ wait_charger_on }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
-            - if:
-                - condition: template
-                  value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
-              then:
-                - service: button.press
-                  data: {}
-                  target:
-                    entity_id: "{{ e_evCarForceUpdateHa }}"
-                - delay: "{{ wait_command_execute }}"
+            # Tesla Fleet API does not have force update button, so should be ok to poll once for everything here.
+            - action: homeassistant.update_entity
+              data:
+                entity_id:
+                  - "{{ e_isCarCharging }}"
+            - delay: "{{ wait_command_execute }}"
+
+            #- if:
+            #    - condition: template
+            #      value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+            #  then:
+            #    - action: button.press
+            #      data: {}
+            #      target:
+            #        entity_id: "{{ e_evCarForceUpdateHa }}"
+            #    - delay: "{{ wait_command_execute }}"
 
         # For debug only
-        #- service: system_log.write
+        #- action: system_log.write
         #  data_template:
         #    message: |-
         #      {{now()}}: 
@@ -1108,7 +1115,7 @@ actions:
                   - condition: template
                     value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
                 then:
-                  - service: button.press
+                  - action: button.press
                     data: {}
                     target:
                       entity_id: "{{ e_evCarForceUpdateHa }}"
@@ -1185,7 +1192,7 @@ actions:
             - condition: template
               value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
-            - service: button.press
+            - action: button.press
               data: {}
               target:
                 entity_id: "{{ e_evCarForceUpdateHa }}"
@@ -1204,7 +1211,7 @@ actions:
           - condition: template
             value_template: "{{ useOcppApi }}"
         then:
-          - service: ocpp.set_charge_rate
+          - action: ocpp.set_charge_rate
             data:
               custom_profile: |
                 {
@@ -1222,14 +1229,14 @@ actions:
                 }
               conn_id: 1
         else:
-          - service: number.set_value
+          - action: number.set_value
             data_template:
               value: "{{ 0 }}"
             target:
               entity_id: "{{ e_carChargingAmps }}"
       - delay: "{{ wait_command_execute }}"
 
-      - service: switch.turn_off
+      - action: switch.turn_off
         data: {}
         target:
           entity_id: "{{ e_carChargerSwitch }}"
@@ -1240,7 +1247,7 @@ actions:
       - condition: template
         value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
     then:
-      - service: button.press
+      - action: button.press
         data: {}
         target:
           entity_id: "{{ e_evCarForceUpdateHa }}"
