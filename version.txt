@@ -1,6 +1,9 @@
 EV Solar Charger
 ================
 
+v3.0beta13  9/3/2025
+-   Breaking change: Need to select your charge control API, default is Telsa custom API.
+
 v3.0beta12  8/3/2025
 -   Poll integration once to get latest update after switching on charger.
 -   Use case insensitive comparison for OCPP charger status.
