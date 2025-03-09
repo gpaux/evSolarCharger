@@ -400,7 +400,7 @@ blueprint:
     car_sensor_charger_pluggedin:
       name: Charger plugged in sensor
       description: >
-        Sensor to check if car is plugged in. This entity is automatically defined if using OCPP API.
+        Sensor to check if car is plugged in.
           * OCPP:         sensor.charger_status_connector
           * Tesla Custom: binary_sensor.charger
           * Tesla Fleet:  binary_sensor.charge_cable
@@ -413,7 +413,7 @@ blueprint:
     car_switch_charger:
       name: Charger on/off switch
       description: >
-        Switch to turn charger on or off. This entity is automatically defined if using OCPP API.
+        Switch to turn charger on or off.
           * OCPP:         switch.charger_charge_control
           * Tesla Custom: switch.charger
           * Tesla Fleet:  switch.charge
@@ -427,7 +427,7 @@ blueprint:
     car_sensor_charging:
       name: Charger charging sensor
       description: >
-        Sensor to check if car is charging. This entity is automatically defined if using OCPP API.
+        Sensor to check if car is charging.
           * OCPP:         sensor.charger_status_connector
           * Tesla Custom: binary_sensor.charging
           * Tesla Fleet:  sensor.charging
@@ -440,7 +440,7 @@ blueprint:
     car_number_charging_amps:
       name: Charger current
       description: >
-        Entity to control current in Ampere used to charge the car battery. This entity is automatically defined if using OCPP API.
+        Entity to control current in Ampere used to charge the car battery.
           * OCPP:         sensor.charger_current_import (read-only)
           * Tesla Custom: number.charging_amps (read/write)
           * Tesla Fleet:  number.charge_current (read/write)
@@ -475,7 +475,7 @@ blueprint:
       name: EV charge limit (optional)
       description: >
         Entity to control car battery charge limit in percentage (100% = fully charged).
-        EV specific integration must be installed.
+        EV specific integration must be installed to use this entity.
           * OCPP:         number.not_defined
           * Tesla Custom: number.charge_limit
           * Tesla Fleet:  number.charge_limit
@@ -490,7 +490,7 @@ blueprint:
       name: EV location tracker (optional)
       description: >
         The entity that provides the location of car.
-        EV specific integration must be installed.
+        EV specific integration must be installed to use this entity.
         Important that home location is defined in Home Assistant.
           * OCPP:         device_tracker.not_defined
           * Tesla Custom: device_tracker.location_tracker
@@ -506,7 +506,7 @@ blueprint:
       name: EV button wake up (optional)
       description: >
         Button to wake up car.
-        EV specific integration must be installed.
+        EV specific integration must be installed to use this entity.
           * OCPP:         button.not_defined
           * Tesla Custom: button.wake_up
           * Tesla Fleet:  button.wake
@@ -521,7 +521,7 @@ blueprint:
       name: EV button force update Home Assistant (optional)
       description: >
         Button to force update sensors in Home Assistant with values from car.
-        EV specific integration must be installed.
+        EV specific integration must be installed to use this entity.
           * OCPP:         button.not_defined
           * Tesla Custom: button.force_data_update
           * Tesla Fleet:  See [vehicle sleep](https://www.home-assistant.io/integrations/tesla_fleet/#vehicle-sleep) for [polling](https://www.home-assistant.io/common-tasks/general/#defining-a-custom-polling-interval) and [cost](https://alerts.home-assistant.io/alerts/tesla_fleet/).
@@ -578,9 +578,6 @@ variables:
   car_charge_limit_max: 100
 
   #####################################
-  # Inputs
-  #####################################
-  #####################################
   # Local variables
   #####################################
   # Must not use states() to access local variables
@@ -633,6 +630,32 @@ variables:
   e_stopCharger: !input toggle_stop_charger
   e_setDailyCarChargeLimit: !input toggle_set_daily_car_charge_limit
   e_publishCarChargeLimit: !input publish_car_charge_limit
+
+  #####################################
+  # Set car charge limit based on which week day
+  #####################################
+  mon: !input car_charge_limit_monday
+  tue: !input car_charge_limit_tuesday
+  wed: !input car_charge_limit_wednesday
+  thu: !input car_charge_limit_thursday
+  fri: !input car_charge_limit_friday
+  sat: !input car_charge_limit_saturday
+  sun: !input car_charge_limit_sunday
+  
+  # Store as integer list
+  carChargeLimitList: "{{ [mon, tue, wed, thu, fri, sat, sun] }}"
+  todayIndex: "{{ now().weekday() }}"
+
+  #####################################
+  # Set car charge limit based on weather forecast
+  #####################################
+  e_weatherProvider: !input weather_provider
+  forecastIndex: !input forecast_index
+  forecastAttribute: !input forecast_attribute
+  carChargeLimitOnBadWeather: !input car_charge_limit_on_bad_weather
+
+  # Not all intervals are available for all providers. Possible values: "hourly", "twice_daily", "daily"
+  forecastInterval: "daily"
 
   #####################################
   # Charge control API
@@ -729,30 +752,11 @@ variables:
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
   #####################################
-  # Set car charge limit based on which week day
+  # API return codes
   #####################################
-  mon: !input car_charge_limit_monday
-  tue: !input car_charge_limit_tuesday
-  wed: !input car_charge_limit_wednesday
-  thu: !input car_charge_limit_thursday
-  fri: !input car_charge_limit_friday
-  sat: !input car_charge_limit_saturday
-  sun: !input car_charge_limit_sunday
-  
-  # Store as integer list
-  carChargeLimitList: "{{ [mon, tue, wed, thu, fri, sat, sun] }}"
-  todayIndex: "{{ now().weekday() }}"
-
-  #####################################
-  # Set car charge limit based on weather forecast
-  #####################################
-  e_weatherProvider: !input weather_provider
-  forecastIndex: !input forecast_index
-  forecastAttribute: !input forecast_attribute
-  carChargeLimitOnBadWeather: !input car_charge_limit_on_bad_weather
-
-  # Not all intervals are available for all providers. Possible values: "hourly", "twice_daily", "daily"
-  forecastInterval: "daily"
+  charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
+  charger_charging_rc: "{{ ['on', 'charging'] }}"
+  charger_connected_and_charging_rc: "{{ ['on', 'preparing', 'charging', 'available'] }}"
 
 ###############################################################################
 # Triggers
@@ -766,6 +770,10 @@ trigger_variables:
   k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
   k_ocpp_charger_api: "k_ocpp_charger_api"
   k_user_custom_api: "k_user_custom_api"
+
+  # For OCPP trigger testing
+  # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'available'] }}"
+  charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
 
   chargeControlApiSelected: !input select_charge_control_api
   ocppChargerName: !input ocpp_charger_name
@@ -806,10 +814,8 @@ triggers:
   # sensor.tesla_ble_vin_charge_cable: No, SAE
 
   # Trigger action if just plugged in.
-  # Use this for OCPP trigger testing,
-  #  value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'available'] }}"
   - trigger: template
-    value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'sae'] }}"
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
 
   # Trigger action at elevation after sunrise.
   - trigger: numeric_state
@@ -837,10 +843,8 @@ conditions:
   #    - "Finishing"
 
   # Charger must be plugged in.
-  # Use this for OCPP trigger testing,
-  #  value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'finishing', 'available'] }}"
   - condition: template
-    value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'finishing'] }}"
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
 
 ###############################################################################
 # Actions
@@ -1074,7 +1078,7 @@ actions:
             # Should remove "Available" in production code, left here for IAMMeter testing only.
             - alias: "Continue if charger is plugged in"
               condition: template
-              value_template: "{{ states(e_carChargerPluggedIn) | lower in ['on', 'preparing', 'charging', 'available'] }}"
+              value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_and_charging_rc }}"
 
             - alias: "Continue if battery is below charge limit"
               condition: template
@@ -1114,7 +1118,7 @@ actions:
             - alias: "Then turn on charger if not already on"
               if:
                 - condition: template
-                  value_template: "{{ not states(e_isCarCharging) | lower in ['on', 'charging'] }}"
+                  value_template: "{{ not states(e_isCarCharging) | lower in charger_charging_rc }}"
               then:
                 # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
                 - action: switch.turn_on
@@ -1243,7 +1247,7 @@ actions:
           - conditions:
               - alias: "Exit script if charger is turned off"
                 condition: template
-                value_template: "{{ not states(e_isCarCharging) | lower in ['on', 'charging'] }}"
+                value_template: "{{ not states(e_isCarCharging) | lower in charger_charging_rc }}"
 
             sequence:
               # Get the latest data from Tesla to update HA before exiting script
@@ -1340,7 +1344,7 @@ actions:
   # Set 0 charging current and turn off charger if it is on or charging
   - if:
       - condition: template
-        value_template: "{{ states(e_isCarCharging) | lower in ['on', 'charging'] }}"
+        value_template: "{{ states(e_isCarCharging) | lower in charger_charging_rc }}"
     then:
       # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
       - if:
