@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta15  9/3/2025
+-   Tidied code.
+-   Updated Tesla BLE MQTT entities and charger cable/status return codes. Thanks @gpaux.
+
 v3.0beta14  9/3/2025
 -   Added API definition for https://github.com/tesla-local-control/tesla_ble_mqtt_docker only, not tested.
 
