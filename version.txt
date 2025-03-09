@@ -1,6 +1,12 @@
 EV Solar Charger
 ================
 
+v3.0beta15  9/3/2025
+-   Added API definition for https://github.com/tesla-local-control/tesla_ble_mqtt_docker only, not tested.
+
+v3.0beta14  9/3/2025
+-   Breaking change: Need to select your charge control API, default is Telsa custom API.
+
 v3.0beta13  9/3/2025
 -   Breaking change: Need to select your charge control API, default is Telsa custom API.
 

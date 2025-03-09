@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta13).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta15).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -342,8 +342,13 @@ blueprint:
         Select the charge control API for controlling EV charging.
         Select [OCPP Charger API](https://github.com/lbbrhzn/ocpp) to control an OCPP compliant charger to charge a EV (tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator) only),
         or [Tesla Custom API](https://github.com/alandtse/tesla),
-        or [Tesla Fleet API](https://www.home-assistant.io/integrations/tesla_fleet) (not tested with this Blueprint),
+        or [Tesla Fleet API](https://www.home-assistant.io/integrations/tesla_fleet) (not tested),
+        or [Tesla BLE MQTT API](https://github.com/tesla-local-control/tesla_ble_mqtt_docker) (not tested),
         or select user custom API to specify your own APIs.
+
+
+        Note: ***The untested APIs above might not work with this Blueprint.***
+          * Default:  Tesla custom API integration
       default: "k_tesla_custom_api"
       selector:
         select:
@@ -352,6 +357,8 @@ blueprint:
             value: "k_tesla_custom_api"
           - label: Tesla Fleet API integration
             value: "k_tesla_fleet_api"
+          - label: Tesla BLE MQTT API integration
+            value: "k_tesla_blemqtt_api"
           - label: OCPP charger API integration
             value: "k_ocpp_charger_api"
           - label: User custom API integration
@@ -621,6 +628,7 @@ variables:
 
   k_tesla_custom_api: "k_tesla_custom_api"
   k_tesla_fleet_api: "k_tesla_fleet_api"
+  k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
   k_ocpp_charger_api: "k_ocpp_charger_api"
   k_user_custom_api: "k_user_custom_api"
 
@@ -656,6 +664,17 @@ variables:
     k_ev_home_tracker: "device_tracker.location"
     k_ev_wake_up: "button.wake"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
+
+  teslaBleMqttApi:
+    k_charger_plugged_in: "sensor.tesla_ble_vin_charging_state"
+    k_charger_onoff_switch: "switch.tesla_ble_vin_charger"
+    k_charger_charging: "sensor.tesla_ble_vin_charging_state"
+    k_charger_current: "number.tesla_ble_vin_charging_current"
+    k_ev_battery_level: "sensor.tesla_ble_vin_battery_level"
+    k_ev_charge_limit: "number.tesla_ble_vin_charging_limit"
+    k_ev_home_tracker: "device_tracker.tesla_ble_vin_presence_bc"
+    k_ev_wake_up: "button.tesla_ble_vin_wake_up_car"
+    k_ev_status_update: "button.tesla_ble_vin_force_update_charge"
 
   useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
   ocppChargerName: !input ocpp_charger_name
@@ -722,6 +741,7 @@ variables:
 trigger_variables:
   k_tesla_custom_api: "k_tesla_custom_api"
   k_tesla_fleet_api: "k_tesla_fleet_api"
+  k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
   k_ocpp_charger_api: "k_ocpp_charger_api"
   k_user_custom_api: "k_user_custom_api"
 
@@ -734,6 +754,8 @@ trigger_variables:
       binary_sensor.charger
     {% elif chargeControlApiSelected == k_tesla_fleet_api %}
       binary_sensor.charge_cable
+    {% elif chargeControlApiSelected == k_tesla_blemqtt_api %}
+      sensor.tesla_ble_vin_charging_state
     {% elif chargeControlApiSelected == k_ocpp_charger_api %}
       sensor.{{ ocppChargerName }}_status_connector
     {% else %}
@@ -803,6 +825,7 @@ actions:
       chargeControlApiMap:
         k_tesla_custom_api: "{{ teslaCustomApi }}"
         k_tesla_fleet_api: "{{ teslaFleetApi }}"
+        k_tesla_blemqtt_api: "{{ teslaBleMqttApi }}"
         k_ocpp_charger_api: "{{ ocppChargerApi }}"
         k_user_custom_api: "{{ userCustomApi }}"
 
