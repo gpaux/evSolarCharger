@@ -374,7 +374,7 @@ blueprint:
       name: OCPP charger name
       description: >
         OCPP charger name as defined on your OCPP server.
-        "Use OCPP API" must be toggled on, otherwise this has no effect.
+        This has no effect unless OCPP API is selected.
           * Default:  charger
       default: "charger"
       selector:
