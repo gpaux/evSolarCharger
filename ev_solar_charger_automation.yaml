@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta15).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta14).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
