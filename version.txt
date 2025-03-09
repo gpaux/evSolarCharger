@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta16  10/3/2025
+-   Fixed missing car location variable required for trigger condition checking.
+-   Need to include Tesla car name in entity if have more than 1 Tesla car. Thanks @John1322.
+
 v3.0beta15  9/3/2025
 -   Tidied code.
 -   Updated Tesla BLE MQTT entities and charger cable/status return codes. Thanks @gpaux.

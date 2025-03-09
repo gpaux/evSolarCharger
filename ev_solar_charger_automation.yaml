@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta15).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta16).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -345,39 +345,39 @@ blueprint:
         or [Tesla Fleet API](https://www.home-assistant.io/integrations/tesla_fleet) (not tested),
         or [Tesla BLE MQTT API](https://github.com/tesla-local-control/tesla_ble_mqtt_docker) (not tested),
         or select user custom API to specify your own entities below.
-        Entities that are not defined for the API can be overridden below.
+        Entities that are not defined for the API can manally entered below.
 
 
         Note: ***The untested APIs above might not work with this Blueprint.***
-          * Default:  Tesla custom API integration
+          * Default:  Tesla custom API
       default: "k_tesla_custom_api"
       selector:
         select:
           options:
-          - label: Tesla custom API integration
+          - label: Tesla custom API
             value: "k_tesla_custom_api"
-          - label: Tesla Fleet API integration
+          - label: Tesla Fleet API
             value: "k_tesla_fleet_api"
-          - label: Tesla BLE MQTT API integration
+          - label: Tesla BLE MQTT API
             value: "k_tesla_blemqtt_api"
-          - label: OCPP charger API integration
+          - label: OCPP charger API
             value: "k_ocpp_charger_api"
-          - label: User custom API integration
+          - label: User custom API
             value: "k_user_custom_api"
           custom_value: false
           multiple: false
           sort: false
         
     #####################################
-    # OCPP configs
+    # Tesla configs
     #####################################
-    ocpp_charger_name:
-      name: OCPP charger name
+    tesla_car_name:
+      name: Tesla car name
       description: >
-        OCPP charger name as defined on your OCPP server.
-        This has no effect unless OCPP API is selected.
-          * Default:  charger
-      default: "charger"
+        Tesla car name combines with entity name to form a new unique entity.
+        This has no effect unless Tesla Custom API or Tesla Fleet API is selected.
+          * Default:  (blank, no quotes)
+      default: ""
       selector:
         text:
 
@@ -385,12 +385,25 @@ blueprint:
     # BLE configs
     #####################################
     ble_vin_id:
-      name: BLE VIN ID
+      name: BLE (Bluetooth Low Energy) VIN ID
       description: >
-        BLE VIN ID.
+        BLE VIN ID combines with entity name to form a new unique entity.
         This has no effect unless Tesla BLE API is selected.
           * Default:  vin
       default: "vin"
+      selector:
+        text:
+
+    #####################################
+    # OCPP configs
+    #####################################
+    ocpp_charger_name:
+      name: OCPP (Open Charge Point Protocol) charger name
+      description: >
+        OCPP charger name as defined on your OCPP server.
+        This has no effect unless OCPP API is selected.
+          * Default:  charger
+      default: "charger"
       selector:
         text:
 
@@ -405,7 +418,7 @@ blueprint:
           * Tesla Custom: binary_sensor.charger
           * Tesla Fleet:  binary_sensor.charge_cable
           * Tesla BLE:    binary_sensor.tesla_ble_vin_charge_cable
-          * User custom:  binary_sensor.not_defined
+          * User custom:  ***Not defined***
       default: binary_sensor.not_defined
       selector:
         entity:
@@ -418,7 +431,7 @@ blueprint:
           * Tesla Custom: switch.charger
           * Tesla Fleet:  switch.charge
           * Tesla BLE:    switch.tesla_ble_vin_charger
-          * User custom:  switch.not_defined
+          * User custom:  ***Not defined***
       default: switch.not_defined
       selector:
         entity:
@@ -432,7 +445,7 @@ blueprint:
           * Tesla Custom: binary_sensor.charging
           * Tesla Fleet:  sensor.charging
           * Tesla BLE:    sensor.tesla_ble_vin_charging_state
-          * User custom:  binary_sensor.not_defined
+          * User custom:  ***Not defined***
       default: binary_sensor.not_defined
       selector:
         entity:
@@ -445,7 +458,7 @@ blueprint:
           * Tesla Custom: number.charging_amps (read/write)
           * Tesla Fleet:  number.charge_current (read/write)
           * Tesla BLE:    number.tesla_ble_vin_charging_current
-          * User custom:  number.not_defined
+          * User custom:  ***Not defined***
       default: number.not_defined
       selector:
         entity:
@@ -461,11 +474,11 @@ blueprint:
         This can be EV specific sensor or OCPP sensor provided the appropiate HA integration is installed.
         The OCPP charger implementation of this sensor might not be reliable.
         If sensor is unreliable or not supported by EV specific API, then enter "sensor.not_defined" to ignore this sensor, and set charge limit in EV to control when to stop charging.
-          * OCPP:         sensor.not_defined (sensor.charger_soc)
+          * OCPP:         ***Not defined*** (sensor.charger_soc)
           * Tesla Custom: sensor.battery
           * Tesla Fleet:  sensor.battery_level
           * Tesla BLE:    sensor.tesla_ble_vin_battery_level
-          * User custom:  sensor.not_defined
+          * User custom:  ***Not defined***
       default: sensor.not_defined
       selector:
         entity:
@@ -476,11 +489,11 @@ blueprint:
       description: >
         Entity to control car battery charge limit in percentage (100% = fully charged).
         EV specific integration must be installed to use this entity.
-          * OCPP:         number.not_defined
+          * OCPP:         ***Not defined***
           * Tesla Custom: number.charge_limit
           * Tesla Fleet:  number.charge_limit
           * Tesla BLE:    number.tesla_ble_vin_charging_limit
-          * User custom:  number.not_defined
+          * User custom:  ***Not defined***
       default: number.not_defined
       selector:
         entity:
@@ -492,11 +505,11 @@ blueprint:
         The entity that provides the location of car.
         EV specific integration must be installed to use this entity.
         Important that home location is defined in Home Assistant.
-          * OCPP:         device_tracker.not_defined
+          * OCPP:         ***Not defined***
           * Tesla Custom: device_tracker.location_tracker
           * Tesla Fleet:  device_tracker.location
-          * Tesla BLE:    device_tracker.not_defined
-          * User custom:  device_tracker.not_defined
+          * Tesla BLE:    ***Not defined***
+          * User custom:  ***Not defined***
       default: device_tracker.not_defined
       selector:
         entity:
@@ -507,11 +520,11 @@ blueprint:
       description: >
         Button to wake up car.
         EV specific integration must be installed to use this entity.
-          * OCPP:         button.not_defined
+          * OCPP:         ***Not defined***
           * Tesla Custom: button.wake_up
           * Tesla Fleet:  button.wake
           * Tesla BLE:    button.tesla_ble_vin_wake_up_car
-          * User custom:  button.not_defined
+          * User custom:  ***Not defined***
       default: button.not_defined
       selector:
         entity:
@@ -522,11 +535,11 @@ blueprint:
       description: >
         Button to force update sensors in Home Assistant with values from car.
         EV specific integration must be installed to use this entity.
-          * OCPP:         button.not_defined
+          * OCPP:         ***Not defined***
           * Tesla Custom: button.force_data_update
-          * Tesla Fleet:  See [vehicle sleep](https://www.home-assistant.io/integrations/tesla_fleet/#vehicle-sleep) for [polling](https://www.home-assistant.io/common-tasks/general/#defining-a-custom-polling-interval) and [cost](https://alerts.home-assistant.io/alerts/tesla_fleet/).
+          * Tesla Fleet:  ***Not defined*** (See [vehicle sleep](https://www.home-assistant.io/integrations/tesla_fleet/#vehicle-sleep) for [polling](https://www.home-assistant.io/common-tasks/general/#defining-a-custom-polling-interval) and [cost](https://alerts.home-assistant.io/alerts/tesla_fleet/).)
           * Tesla BLE:    button.tesla_ble_vin_force_update_charge
-          * User custom:  button.not_defined
+          * User custom:  ***Not defined***
       default: button.not_defined
       selector:
         entity:
@@ -662,6 +675,7 @@ variables:
   #####################################
   # https://community.home-assistant.io/t/how-to-use-if-then-statements-to-create-dictionary-variables-in-scripts/688152
   # https://community.home-assistant.io/t/return-a-variable-which-is-a-dictionary-in-script-to-automation/796744/5
+  # Dictionaries can be defined here but not accessed here!
   chargeControlApiSelected: !input select_charge_control_api
 
   i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
@@ -690,27 +704,33 @@ variables:
   k_ev_wake_up: "k_ev_wake_up"
   k_ev_status_update: "k_ev_status_update"
 
-  # Dictionaries can be defined here but not accessed here!
+  teslaCarId: !input tesla_car_name
+  teslaCarName: >
+    {% if teslaCarId == "" %}
+      {{ teslaCarId }}
+    {% else %}
+      {{ teslaCarId }}_
+    {% endif %}
   teslaCustomApi:
-    k_charger_plugged_in: "binary_sensor.charger"
-    k_charger_onoff_switch: "switch.charger"
-    k_charger_charging: "binary_sensor.charging"
-    k_charger_current: "number.charging_amps"
-    k_ev_battery_level: "sensor.battery"
-    k_ev_charge_limit: "number.charge_limit"
-    k_ev_home_tracker: "device_tracker.location_tracker"
-    k_ev_wake_up: "button.wake_up"
-    k_ev_status_update: "button.force_data_update"
+    k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charger"
+    k_charger_onoff_switch: "switch.{{ teslaCarName }}charger"
+    k_charger_charging: "binary_sensor.{{ teslaCarName }}charging"
+    k_charger_current: "number.{{ teslaCarName }}charging_amps"
+    k_ev_battery_level: "sensor.{{ teslaCarName }}battery"
+    k_ev_charge_limit: "number.{{ teslaCarName }}charge_limit"
+    k_ev_home_tracker: "device_tracker.{{ teslaCarName }}location_tracker"
+    k_ev_wake_up: "button.{{ teslaCarName }}wake_up"
+    k_ev_status_update: "button.{{ teslaCarName }}force_data_update"
 
   teslaFleetApi:
-    k_charger_plugged_in: "binary_sensor.charge_cable"
-    k_charger_onoff_switch: "switch.charge"
-    k_charger_charging: "sensor.charging"
-    k_charger_current: "number.charge_current"
-    k_ev_battery_level: "sensor.battery_level"
-    k_ev_charge_limit: "number.charge_limit"
-    k_ev_home_tracker: "device_tracker.location"
-    k_ev_wake_up: "button.wake"
+    k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charge_cable"
+    k_charger_onoff_switch: "switch.{{ teslaCarName }}charge"
+    k_charger_charging: "sensor.{{ teslaCarName }}charging"
+    k_charger_current: "number.{{ teslaCarName }}charge_current"
+    k_ev_battery_level: "sensor.{{ teslaCarName }}battery_level"
+    k_ev_charge_limit: "number.{{ teslaCarName }}charge_limit"
+    k_ev_home_tracker: "device_tracker.{{ teslaCarName }}location"
+    k_ev_wake_up: "button.{{ teslaCarName }}wake"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
   bleVinId: !input ble_vin_id
@@ -763,7 +783,7 @@ variables:
 # Note:
 # - Tesla triggers do not update often due to infrequent polling.
 ###############################################################################
-# Trigger variables must be defined here because triggers do not have access to global variables at time of trigger.
+# Trigger variables must be defined here because triggers and conditions do not have access to global variables at time of trigger.
 trigger_variables:
   k_tesla_custom_api: "k_tesla_custom_api"
   k_tesla_fleet_api: "k_tesla_fleet_api"
@@ -776,10 +796,27 @@ trigger_variables:
   charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
 
   chargeControlApiSelected: !input select_charge_control_api
+
+  teslaCarId: !input tesla_car_name
+  teslaCarName: >
+    {% if teslaCarId == "" %}
+      {{ teslaCarId }}
+    {% else %}
+      {{ teslaCarId }}_
+    {% endif %}
+  i_evCarLocation: !input car_location_tracker
+  e_evCarLocation: >
+    {% if chargeControlApiSelected == k_tesla_custom_api %}
+      device_tracker.{{ teslaCarName }}location_tracker
+    {% elif chargeControlApiSelected == k_tesla_fleet_api %}
+      device_tracker.{{ teslaCarName }}location
+    {% else %}
+      {{ i_evCarLocation }}
+    {% endif %}
+
   ocppChargerName: !input ocpp_charger_name
   bleVinId: !input ble_vin_id
   i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
-
   e_carChargerPluggedIn: >
     {% if chargeControlApiSelected == k_tesla_custom_api %}
       binary_sensor.charger
