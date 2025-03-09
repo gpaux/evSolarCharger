@@ -345,7 +345,7 @@ blueprint:
         or [Tesla Fleet API](https://www.home-assistant.io/integrations/tesla_fleet) (not tested),
         or [Tesla BLE MQTT API](https://github.com/tesla-local-control/tesla_ble_mqtt_docker) (not tested),
         or select user custom API to specify your own entities below.
-        Entities that are not defined for the API can be manally entered below.
+        Entities that are not defined for the API can be manually entered below.
 
 
         Note: ***The untested APIs above might not work with this Blueprint.***
