@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta16).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta17).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -591,9 +591,8 @@ variables:
   car_charge_limit_max: 100
 
   #####################################
-  # Local variables
+  # Inputs
   #####################################
-  # Must not use states() to access local variables
   carChargerVoltage: !input charger_voltage
   carChargerMaxCurrent: !input charger_max_current
 
@@ -632,7 +631,8 @@ variables:
 
   #####################################
   # e_ => External entities
-  # Must use states() to access external entities
+  # Must use states() to access external entities.
+  # Must not use states() to access local variables.
   #####################################
   # sensor_main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
   e_mainPowerNet: !input sensor_main_power_net
@@ -747,6 +747,8 @@ variables:
     k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
 
   ocppChargerName: !input ocpp_charger_name
+  useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
+  e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
   ocppChargerApi:
     k_charger_plugged_in: "sensor.{{ ocppChargerName }}_status_connector"
     k_charger_onoff_switch: "switch.{{ ocppChargerName }}_charge_control"
@@ -757,8 +759,6 @@ variables:
     k_ev_home_tracker: "{{ i_evCarLocation }}"
     k_ev_wake_up: "{{ i_evCarWakeUp }}"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
-  e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
-  useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
 
   userCustomApi:
     k_charger_plugged_in: "{{ i_carChargerPluggedIn }}"
@@ -774,8 +774,23 @@ variables:
   #####################################
   # API return codes
   #####################################
+  # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
+  # Available (no EV connected)
+  # Preparing (EV plugged in but not yet charging)
+  # Charging (active charging session)
+  # Finishing (charging session ending)
+
+  # Fleet API entities
+  # sensor.charging: starting, charging, stopped, complete, disconnected, no_power
+
+  # BLE entities
+  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
+  # sensor.tesla_ble_vin_charge_cable: No, SAE
+
   charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
   charger_charging_rc: "{{ ['on', 'charging'] }}"
+
+  # Should remove 'available' in production code, left here for IAMMeter testing only.
   charger_connected_and_charging_rc: "{{ ['on', 'preparing', 'charging', 'available'] }}"
 
 ###############################################################################
@@ -791,7 +806,7 @@ trigger_variables:
   k_ocpp_charger_api: "k_ocpp_charger_api"
   k_user_custom_api: "k_user_custom_api"
 
-  # For OCPP trigger testing
+  # For OCPP trigger testing using IAMMeter.
   # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'available'] }}"
   charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
 
@@ -832,24 +847,6 @@ trigger_variables:
 
 triggers:
 
-  # State entity_id can only work with !input syntax, ie. cannot be a variable!!!
-  #- platform: state
-  #  entity_id:
-  #    - !input car_sensor_charger_pluggedin
-  #  to:
-  #    - "on"
-  #    - "Preparing"
-
-  # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
-  # Available (no EV connected)
-  # Preparing (EV plugged in but not yet charging)
-  # Charging (active charging session)
-  # Finishing (charging session ending)
-
-  # BLE entities
-  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
-  # sensor.tesla_ble_vin_charge_cable: No, SAE
-
   # Trigger action if just plugged in.
   - trigger: template
     value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
@@ -870,14 +867,6 @@ conditions:
       {% else %}
         {{ true }}
       {% endif %}
-
-  # State entity_id can only work with !input syntax, ie. cannot be a variable!!!
-  #- condition: state
-  #  entity_id: !input car_sensor_charger_pluggedin
-  #  state:
-  #    - "on"
-  #    - "Preparing"
-  #    - "Finishing"
 
   # Charger must be plugged in.
   - condition: template
@@ -952,10 +941,6 @@ actions:
 
   - choose:
 
-    # Note the following syntax caused variables not to be highlighted in HA trace "Step Config" tab.
-    #- conditions: >
-    #    {{ todayCarChargeLimit >= car_charge_limit_min and todayCarChargeLimit <= car_charge_limit_max }}
-
     - conditions:
         - alias: "If set daily car charge limit on start up"
           condition: template
@@ -969,7 +954,7 @@ actions:
               value_template: "{{ chargeCarBaseOnWeather }}"
           then:
             - alias: "Then get weather forecast data"
-              service: weather.get_forecasts
+              action: weather.get_forecasts
               target:
                 entity_id: "{{ e_weatherProvider }}"
               data:
@@ -1052,11 +1037,11 @@ actions:
                 entity_id: "{{ e_publishCarChargeLimit }}"
                 value: "{{ finalCarChargeLimit }}"
 
+        # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
         - if:
             - condition: template
               value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
-            # Car charger is turned on if setting higher charge limit, so must get latest update before proceeding. Otherwise script can exit without turning off charger.
             - action: button.press
               data: {}
               target:
@@ -1093,26 +1078,21 @@ actions:
                   {{ true }}
                 {% endif %}
 
-            # State entity_id can only work with !input syntax, ie. cannot be a variable!!! Otherwise will get this error.
+            # State entity_id can only work with !input syntax in triggers, conditions and actions sections, ie. cannot be a variable!!! Otherwise will get this error.
             #
-            # Blueprint 'EV solar charger automation' generated invalid automation with inputs {'sensor_main_power_net': 'input_number.test_power_net', 
-            # 'publish_car_charge_limit': 'number.not_defined', 'car_button_forceupdate_ha': 'sensor.not_defined', 'car_button_wake_up': 'sensor.not_defined', 
-            # 'car_location_tracker': 'sensor.not_defined', 'car_number_charge_limit': 'sensor.not_defined', 'car_sensor_battery': 'sensor.not_defined', 
-            # 'use_ocpp_api': True, 'car_sensor_charger_pluggedin': 'sensor.charger_status_connector'}: 
+            # Blueprint 'EV solar charger automation' generated invalid automation with inputs {'select_charge_control_api': 'k_ocpp_charger_api', 
+            # 'sensor_main_power_net': 'input_number.test_power_net', 'toggle_secondary_power_source': 'input_boolean.tesla23m3_charge_from_grid'}: 
             # Entity {{ e_carChargerPluggedIn }} is neither a valid entity ID nor a valid UUID for 
-            # dictionary value @ data['actions'][4]['repeat']['while'][0]['conditions'][1]['entity_id']. Got '{{ e_carChargerPluggedIn }}'
+            # dictionary value @ data['actions'][5]['repeat']['while'][0]['conditions'][1]['entity_id']. Got '{{ e_carChargerPluggedIn }}'
+            # - alias: "Continue if charger is plugged in"
+            #   condition: state
+            #   entity_id: !input car_sensor_charger_pluggedin
+            #   # entity_id: "{{ e_carChargerPluggedIn }}"
+            #   state:
+            #     - "on"
+            #     - "Preparing"
+            #     - "Charging"
 
-            # Should remove "Available" in production code, left here for IAMMeter testing only.
-            #- alias: "Continue if charger is plugged in"
-            #  condition: state
-            #  entity_id: !input car_sensor_charger_pluggedin
-            #  state:
-            #    - "on"
-            #    - "Preparing"
-            #    - "Charging"
-            #    - "Available"
-
-            # Should remove "Available" in production code, left here for IAMMeter testing only.
             - alias: "Continue if charger is plugged in"
               condition: template
               value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_and_charging_rc }}"
@@ -1165,7 +1145,8 @@ actions:
                 - delay: "{{ wait_charger_on }}"
 
             # Always set initial charge current here after turning on charger.
-            # The new charge current value will only be set if the old and new values are different. Confirmed in log.
+            # Tesla API will only set new charge current if the old and new values are different. Confirmed in log.
+            # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
             - alias: "And set initial charge current"
               if:
                 - condition: template
@@ -1197,31 +1178,12 @@ actions:
             - delay: "{{ wait_charger_on }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
-            # Tesla Fleet API does not have force update button, so should be ok to poll once for everything here.
+            # Tesla Fleet API does not have force update button, so should be ok to poll once here for everything.
             - action: homeassistant.update_entity
               data:
                 entity_id:
                   - "{{ e_isCarCharging }}"
             - delay: "{{ wait_command_execute }}"
-
-            #- if:
-            #    - condition: template
-            #      value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
-            #  then:
-            #    - action: button.press
-            #      data: {}
-            #      target:
-            #        entity_id: "{{ e_evCarForceUpdateHa }}"
-            #    - delay: "{{ wait_command_execute }}"
-
-        # For debug only
-        #- action: system_log.write
-        #  data_template:
-        #    message: |-
-        #      {{now()}}: 
-        #      e_carChargingAmps={{e_carChargingAmps}}, e_ocppChargerTransactionId={{e_ocppChargerTransactionId}}
-        #    #level: warning
-        #    level: info
 
         - variables:
             # Minimum charge current
@@ -1287,12 +1249,12 @@ actions:
                 value_template: "{{ not states(e_isCarCharging) | lower in charger_charging_rc }}"
 
             sequence:
-              # Get the latest data from Tesla to update HA before exiting script
               - if:
                   - condition: template
                     value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
                 then:
-                  - action: button.press
+                  - alias: "Get the latest data from Tesla to update HA before exiting script"
+                    action: button.press
                     data: {}
                     target:
                       entity_id: "{{ e_evCarForceUpdateHa }}"
@@ -1303,14 +1265,12 @@ actions:
                 # Cannot get response_variable to work. Needs to be key/value pair?
                 #response_variable: "stop_charging_reason"
 
-          # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
           - conditions:
-              - alias: "If using OCPP to change charging current"
+              - alias: "Set new charge current if using OCPP"
                 condition: template
                 value_template: "{{ useOcppApi and newChargeCurrent != carChargeCurrent }}"
             sequence:
-              - alias: "Then set current using OCPP"
-                service: ocpp.set_charge_rate     
+              - action: ocpp.set_charge_rate     
                 data:
                   custom_profile: |
                     {
@@ -1328,32 +1288,21 @@ actions:
                     }
                   conn_id: 1
 
-          # If using EV specific API.
           # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
           - conditions:
-              - alias: "If using EV specific API to change charging current"
+              - alias: "Set new charge current if using EV specific API"
                 condition: template
                 value_template: "{{ not useOcppApi and newChargeCurrent != carChargeCurrent }}"
             sequence:
-              - alias: "Then set current using EV specific API"
-                service: number.set_value
+              - action: number.set_value
                 data_template:
                   value: "{{ newChargeCurrent }}"
                 target:
                   entity_id: "{{ e_carChargingAmps }}"
 
-          # Do nothing.
-          - conditions:
-              - alias: "If no need to change charge current"
-                condition: template
-                value_template: "{{ newChargeCurrent == carChargeCurrent }}"
-            sequence:
-              - alias: "Then do not change charger current"
-                delay: "00:00:00"
-
           # Default do nothing.
           default:
-            - alias: "Should never get to this default branch"
+            - alias: "Do nothing since new current is same as old"
               delay: "00:00:00"
 
         # Sleep enough to allow solar inverter updates. Should be ok to sleep longer to avoid changing charge current too often.
