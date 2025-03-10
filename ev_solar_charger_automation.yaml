@@ -1247,7 +1247,6 @@ actions:
               - alias: "Exit script if charger is turned off"
                 condition: template
                 value_template: "{{ not states(e_isCarCharging) | lower in charger_charging_rc }}"
-
             sequence:
               - if:
                   - condition: template
@@ -1259,48 +1258,44 @@ actions:
                     target:
                       entity_id: "{{ e_evCarForceUpdateHa }}"
                   - delay: "{{ wait_command_execute }}"
-
               - stop: "Exiting script due to charger turned off manually or automatically by car when charge limit reached."
                 # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
                 # Cannot get response_variable to work. Needs to be key/value pair?
                 #response_variable: "stop_charging_reason"
 
           - conditions:
-              - alias: "Set new charge current if using OCPP"
+              - alias: "Set charge current if new current is different from old"
                 condition: template
-                value_template: "{{ useOcppApi and newChargeCurrent != carChargeCurrent }}"
+                value_template: "{{ newChargeCurrent != carChargeCurrent }}"
             sequence:
-              - action: ocpp.set_charge_rate     
-                data:
-                  custom_profile: |
-                    {
-                      "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
-                      "chargingProfileId": 1,
-                      "stackLevel": 0,
-                      "chargingProfilePurpose": "TxProfile",
-                      "chargingProfileKind": "Relative",
-                      "chargingSchedule": {
-                        "chargingRateUnit": "A",
-                        "chargingSchedulePeriod": [
-                          {"startPeriod": 0, "limit": {{ newChargeCurrent }}}  
-                        ]
-                      }
-                    }
-                  conn_id: 1
+              - if:
+                  - condition: template
+                    value_template: "{{ useOcppApi }}"
+                then:
+                  - action: ocpp.set_charge_rate
+                    data:
+                      custom_profile: |
+                        {
+                          "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+                          "chargingProfileId": 1,
+                          "stackLevel": 0,
+                          "chargingProfilePurpose": "TxProfile",
+                          "chargingProfileKind": "Relative",
+                          "chargingSchedule": {
+                            "chargingRateUnit": "A",
+                            "chargingSchedulePeriod": [
+                              {"startPeriod": 0, "limit": {{ newChargeCurrent }}}  
+                            ]
+                          }
+                        }
+                      conn_id: 1
+                else:
+                  - action: number.set_value
+                    data_template:
+                      value: "{{ newChargeCurrent }}"
+                    target:
+                      entity_id: "{{ e_carChargingAmps }}"
 
-          # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
-          - conditions:
-              - alias: "Set new charge current if using EV specific API"
-                condition: template
-                value_template: "{{ not useOcppApi and newChargeCurrent != carChargeCurrent }}"
-            sequence:
-              - action: number.set_value
-                data_template:
-                  value: "{{ newChargeCurrent }}"
-                target:
-                  entity_id: "{{ e_carChargingAmps }}"
-
-          # Default do nothing.
           default:
             - alias: "Do nothing since new current is same as old"
               delay: "00:00:00"
@@ -1332,7 +1327,6 @@ actions:
       - condition: template
         value_template: "{{ states(e_isCarCharging) | lower in charger_charging_rc }}"
     then:
-      # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
       - if:
           - condition: template
             value_template: "{{ useOcppApi }}"
@@ -1355,6 +1349,8 @@ actions:
                 }
               conn_id: 1
         else:
+          # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
+          # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
           - action: number.set_value
             data_template:
               value: "{{ 0 }}"
