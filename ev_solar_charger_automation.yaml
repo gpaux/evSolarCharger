@@ -741,10 +741,10 @@ variables:
     k_charger_current: "number.tesla_ble_{{ bleVinId }}_charging_current"
     k_ev_battery_level: "sensor.tesla_ble_{{ bleVinId }}_battery_level"
     k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
-    # k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence_bc"
-    k_ev_home_tracker: "{{ i_evCarLocation }}"
+    k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence"
+    #k_ev_home_tracker: "{{ i_evCarLocation }}"
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
-    k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
+    k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
 
   ocppChargerName: !input ocpp_charger_name
   useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
@@ -787,7 +787,7 @@ variables:
   # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
   # sensor.tesla_ble_vin_charge_cable: No, SAE
 
-  charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
+  charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
   charger_charging_rc: "{{ ['on', 'charging'] }}"
 
   # Should remove 'available' in production code, left here for IAMMeter testing only.
