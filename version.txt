@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta19  11/3/2025
+-   Fixed Tesla custom API trigger issue.
+-   Tidied code.
+
 v3.0beta18  11/3/2025
 -   Preliminary testing with Tesla BLE MQTT v0.5.0 https://github.com/tesla-local-control/tesla_ble_mqtt_docker using button.tesla_ble_vin_force_update_all.
 

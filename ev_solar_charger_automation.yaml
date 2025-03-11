@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta18).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta19).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -374,8 +374,9 @@ blueprint:
     tesla_car_name:
       name: Tesla car name
       description: >
-        Tesla car name combines with entity name to form a new unique entity.
-        This has no effect unless Tesla Custom API or Tesla Fleet API is selected.
+        Enter the Tesla car name for use with Tesla Custom API or Tesla Fleet API.
+        Tesla car name combines with base entity name to form a unique entity identifier.
+        No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  (blank, no quotes)
       default: ""
       selector:
@@ -387,8 +388,9 @@ blueprint:
     ble_vin_id:
       name: BLE (Bluetooth Low Energy) VIN ID
       description: >
-        BLE VIN ID combines with entity name to form a new unique entity.
-        This has no effect unless Tesla BLE API is selected.
+        Enter the BLE VIN ID for use with Tesla BLE MQTT API.
+        BLE VIN ID combines with base entity name to form a unique entity identifier.
+        No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  vin
       default: "vin"
       selector:
@@ -400,8 +402,9 @@ blueprint:
     ocpp_charger_name:
       name: OCPP (Open Charge Point Protocol) charger name
       description: >
-        OCPP charger name as defined on your OCPP server.
-        This has no effect unless OCPP API is selected.
+        Enter the OCPP charger name as defined on your OCPP server for use with OCPP charger API.
+        OCPP charger name combines with base entity name to form a unique entity identifier.
+        No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  charger
       default: "charger"
       selector:
@@ -707,12 +710,12 @@ variables:
   k_ev_wake_up: "k_ev_wake_up"
   k_ev_status_update: "k_ev_status_update"
 
-  teslaCarId: !input tesla_car_name
+  i_teslaCarName: !input tesla_car_name
   teslaCarName: >
-    {% if teslaCarId == "" %}
-      {{ teslaCarId }}
+    {% if i_teslaCarName == "" %}
+      {{ i_teslaCarName }}
     {% else %}
-      {{ teslaCarId }}_
+      {{ i_teslaCarName | lower }}_
     {% endif %}
   teslaCustomApi:
     k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charger"
@@ -737,8 +740,9 @@ variables:
     k_ev_wake_up: "button.{{ teslaCarName }}wake"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
-  bleVinId: !input ble_vin_id
   useBleMqttApi: "{{ chargeControlApiSelected == k_tesla_blemqtt_api }}"
+  i_bleVinId: !input ble_vin_id
+  bleVinId: "{{ i_bleVinId | lower }}"
   teslaBleMqttApi:
     k_charger_plugged_in: "sensor.tesla_ble_{{ bleVinId }}_charge_cable"
     k_charger_onoff_switch: "switch.tesla_ble_{{ bleVinId }}_charger"
@@ -752,8 +756,9 @@ variables:
     #k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
-  ocppChargerName: !input ocpp_charger_name
   useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
+  i_ocppChargerName: !input ocpp_charger_name
+  ocppChargerName: "{{ i_ocppChargerName | lower }}"
   e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
   ocppChargerApi:
     k_charger_plugged_in: "sensor.{{ ocppChargerName }}_status_connector"
@@ -818,13 +823,18 @@ trigger_variables:
 
   chargeControlApiSelected: !input select_charge_control_api
 
-  teslaCarId: !input tesla_car_name
+  i_teslaCarName: !input tesla_car_name
   teslaCarName: >
-    {% if teslaCarId == "" %}
-      {{ teslaCarId }}
+    {% if i_teslaCarName == "" %}
+      {{ i_teslaCarName }}
     {% else %}
-      {{ teslaCarId }}_
+      {{ i_teslaCarName | lower }}_
     {% endif %}
+  i_bleVinId: !input ble_vin_id
+  bleVinId: "{{ i_bleVinId | lower }}"
+  i_ocppChargerName: !input ocpp_charger_name
+  ocppChargerName: "{{ i_ocppChargerName | lower }}"
+
   i_evCarLocation: !input car_location_tracker
   e_evCarLocation: >
     {% if chargeControlApiSelected == k_tesla_custom_api %}
@@ -835,14 +845,12 @@ trigger_variables:
       {{ i_evCarLocation }}
     {% endif %}
 
-  ocppChargerName: !input ocpp_charger_name
-  bleVinId: !input ble_vin_id
   i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
   e_carChargerPluggedIn: >
     {% if chargeControlApiSelected == k_tesla_custom_api %}
-      binary_sensor.charger
+      binary_sensor.{{ teslaCarName }}charger
     {% elif chargeControlApiSelected == k_tesla_fleet_api %}
-      binary_sensor.charge_cable
+      binary_sensor.{{ teslaCarName }}charge_cable
     {% elif chargeControlApiSelected == k_tesla_blemqtt_api %}
       sensor.tesla_ble_{{ bleVinId }}_charge_cable
     {% elif chargeControlApiSelected == k_ocpp_charger_api %}
