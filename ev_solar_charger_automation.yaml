@@ -585,6 +585,9 @@ variables:
   wait_command_execute: 5
   #wait_command_execute_str: "00:00:{{ wait_command_execute }}"
 
+  # BLE seemed to require longer update time
+  wait_ble_update: 40
+
   # Valid charge limit range for Tesla API, otherwise will get following error,
   # Error: Value 0.0 for number.charge_limit is outside valid range 50 - 100
   car_charge_limit_min: 50
@@ -735,6 +738,7 @@ variables:
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
   bleVinId: !input ble_vin_id
+  useBleMqttApi: "{{ chargeControlApiSelected == k_tesla_blemqtt_api }}"
   teslaBleMqttApi:
     k_charger_plugged_in: "sensor.tesla_ble_{{ bleVinId }}_charge_cable"
     k_charger_onoff_switch: "switch.tesla_ble_{{ bleVinId }}_charger"
@@ -1177,7 +1181,6 @@ actions:
                     value: "{{ initial_charge_current }}"
                   target:
                     entity_id: "{{ e_carChargingAmps }}"
-            - delay: "{{ wait_charger_on }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
             - if:
@@ -1200,6 +1203,13 @@ actions:
                     entity_id:
                       - "{{ e_isCarCharging }}"
                 - delay: "{{ wait_command_execute }}"
+
+            # Extra delay required for BLE MQTT to register change in charging state.
+            - if:
+                - condition: template
+                  value_template: "{{ useBleMqttApi }}"
+              then:
+                - delay: "{{ wait_ble_update }}"
 
         - variables:
             # Minimum charge current
