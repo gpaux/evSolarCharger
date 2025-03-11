@@ -78,7 +78,7 @@ Settings > Devices & Services > Helpers > Create Helper >
 5.	Number or template sensor: MyEV power offset
 6.	Toggle: MyEV stop charging
 
--	Config the Blueprint automation specifying the power feedback loop sensor, charger voltage, maximum current and helper entities created above, ie.
+-	Config the Blueprint automation specifying the power feedback loop sensor, charger voltage, maximum current and the optional helper entities created above, ie.
 Settings > Automations & Scenes > Blueprints > EV solar charger automation
 
 
