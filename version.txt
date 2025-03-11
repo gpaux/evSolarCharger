@@ -1,6 +1,9 @@
 EV Solar Charger
 ================
 
+v3.0beta18  11/3/2025
+-   Preliminary testing with Tesla BLE MQTT v0.5.0 https://github.com/tesla-local-control/tesla_ble_mqtt_docker using button.tesla_ble_vin_force_update_all.
+
 v3.0beta17  10/3/2025
 -   Tidied code.
 

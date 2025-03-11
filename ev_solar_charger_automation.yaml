@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta17).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta18).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -508,7 +508,7 @@ blueprint:
           * OCPP:         ***Not defined***
           * Tesla Custom: device_tracker.location_tracker
           * Tesla Fleet:  device_tracker.location
-          * Tesla BLE:    ***Not defined***
+          * Tesla BLE:    ***Not defined*** (device_tracker.tesla_ble_vin_presence)
           * User custom:  ***Not defined***
       default: device_tracker.not_defined
       selector:
@@ -538,7 +538,7 @@ blueprint:
           * OCPP:         ***Not defined***
           * Tesla Custom: button.force_data_update
           * Tesla Fleet:  ***Not defined*** (See [vehicle sleep](https://www.home-assistant.io/integrations/tesla_fleet/#vehicle-sleep) for [polling](https://www.home-assistant.io/common-tasks/general/#defining-a-custom-polling-interval) and [cost](https://alerts.home-assistant.io/alerts/tesla_fleet/).)
-          * Tesla BLE:    button.tesla_ble_vin_force_update_charge
+          * Tesla BLE:    ***Not defined*** (button.tesla_ble_vin_force_update_all)
           * User custom:  ***Not defined***
       default: button.not_defined
       selector:
@@ -722,6 +722,7 @@ variables:
     k_ev_wake_up: "button.{{ teslaCarName }}wake_up"
     k_ev_status_update: "button.{{ teslaCarName }}force_data_update"
 
+  useTeslaFleetApi: "{{ chargeControlApiSelected == k_tesla_fleet_api }}"
   teslaFleetApi:
     k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charge_cable"
     k_charger_onoff_switch: "switch.{{ teslaCarName }}charge"
@@ -741,10 +742,11 @@ variables:
     k_charger_current: "number.tesla_ble_{{ bleVinId }}_charging_current"
     k_ev_battery_level: "sensor.tesla_ble_{{ bleVinId }}_battery_level"
     k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
-    k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence"
-    #k_ev_home_tracker: "{{ i_evCarLocation }}"
+    #k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence"
+    k_ev_home_tracker: "{{ i_evCarLocation }}"
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
-    k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
+    #k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
+    k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
   ocppChargerName: !input ocpp_charger_name
   useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
@@ -791,7 +793,7 @@ variables:
   charger_charging_rc: "{{ ['on', 'charging'] }}"
 
   # Should remove 'available' in production code, left here for IAMMeter testing only.
-  charger_connected_and_charging_rc: "{{ ['on', 'preparing', 'charging', 'available'] }}"
+  charger_connected_and_charging_rc: "{{ ['on', 'preparing', 'sae', 'iec', 'charging', 'available'] }}"
 
 ###############################################################################
 # Triggers
@@ -1178,12 +1180,26 @@ actions:
             - delay: "{{ wait_charger_on }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
+            - if:
+                - condition: template
+                  value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+              then:
+                - action: button.press
+                  data: {}
+                  target:
+                    entity_id: "{{ e_evCarForceUpdateHa }}"
+                - delay: "{{ wait_command_execute }}"
+
             # Tesla Fleet API does not have force update button, so should be ok to poll once here for everything.
-            - action: homeassistant.update_entity
-              data:
-                entity_id:
-                  - "{{ e_isCarCharging }}"
-            - delay: "{{ wait_command_execute }}"
+            - if:
+                - condition: template
+                  value_template: "{{ useTeslaFleetApi }}"
+              then:
+                - action: homeassistant.update_entity
+                  data:
+                    entity_id:
+                      - "{{ e_isCarCharging }}"
+                - delay: "{{ wait_command_execute }}"
 
         - variables:
             # Minimum charge current
