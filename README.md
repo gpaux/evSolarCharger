@@ -69,7 +69,7 @@ Device: Envoy [YourEnvoyId]
 -	Import the Blueprint automatically by clicking above, or manually copy the Blueprint file to following location and reload HA config,
 \\HOMEASSISTANT\config\blueprints\automation\flashg1\ev_solar_charger_automation.yaml
 
--	Create following helpers, eg.
+-	Optionally create following helpers, or create them later for finer control, eg.
 Settings > Devices & Services > Helpers > Create Helper >
 1.	Toggle: MyEV set daily car charge limit
 2.  Number: MyEV publish car charge limit
