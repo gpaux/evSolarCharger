@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta19).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta20).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -511,7 +511,7 @@ blueprint:
           * OCPP:         ***Not defined***
           * Tesla Custom: device_tracker.location_tracker
           * Tesla Fleet:  device_tracker.location
-          * Tesla BLE:    ***Not defined*** (device_tracker.tesla_ble_vin_presence)
+          * Tesla BLE:    ***Not defined*** (binary_sensor.tesla_ble_vin_presence)
           * User custom:  ***Not defined***
       default: device_tracker.not_defined
       selector:
@@ -579,17 +579,20 @@ variables:
 
   # Time to wait in seconds for current to change after sending command.
   #wait_current_change: "00:00:0.3"
-  wait_current_change: 0.3
+  wait_current_change: 1
 
   # Wait in seconds after setting car charge limit.
   wait_charge_limit: 5
+
+  # Wait in seconds after getting status to update HA.
+  wait_force_update: 5
   
   # Time to wait in seconds for command to execute after sending command.
   wait_command_execute: 5
   #wait_command_execute_str: "00:00:{{ wait_command_execute }}"
 
   # BLE seemed to require longer update time
-  wait_ble_update: 40
+  wait_ble_charging_state: 120
 
   # Valid charge limit range for Tesla API, otherwise will get following error,
   # Error: Value 0.0 for number.charge_limit is outside valid range 50 - 100
@@ -750,7 +753,7 @@ variables:
     k_charger_current: "number.tesla_ble_{{ bleVinId }}_charging_current"
     k_ev_battery_level: "sensor.tesla_ble_{{ bleVinId }}_battery_level"
     k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
-    #k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence"
+    #k_ev_home_tracker: "binary_sensor.tesla_ble_{{ bleVinId }}_presence"
     k_ev_home_tracker: "{{ i_evCarLocation }}"
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
     #k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
@@ -785,24 +788,33 @@ variables:
   #####################################
   # API return codes
   #####################################
+  # Tesla Custom API entities
+  # binary_sensor.charger: on, off
+  # binary_sensor.charging: on, off
+
+  # Tesla Fleet API entities
+  # binary_sensor.charge_cable: on, off
+  # sensor.charging: starting, charging, stopped, complete, disconnected, no_power
+
+  # BLE entities
+  # sensor.tesla_ble_vin_charge_cable: No, SAE, IEC
+  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
+  # binary_sensor.tesla_ble_vin_presence: on=home, off=away (sensor not 100% accurate)
+
   # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
   # Available (no EV connected)
   # Preparing (EV plugged in but not yet charging)
   # Charging (active charging session)
   # Finishing (charging session ending)
 
-  # Fleet API entities
-  # sensor.charging: starting, charging, stopped, complete, disconnected, no_power
-
-  # BLE entities
-  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
-  # sensor.tesla_ble_vin_charge_cable: No, SAE
-
   charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
   charger_charging_rc: "{{ ['on', 'charging'] }}"
 
+  # Note: OCPP use single sensor to indicate plugged in and charging
   # Should remove 'available' in production code, left here for IAMMeter testing only.
-  charger_connected_and_charging_rc: "{{ ['on', 'preparing', 'sae', 'iec', 'charging', 'available'] }}"
+  charger_connected_or_charging_rc: "{{ charger_connected_rc + charger_charging_rc + ['available'] }}"
+
+  ev_at_home_rc: "{{ ['home', 'on'] }}"
 
 ###############################################################################
 # Triggers
@@ -818,8 +830,9 @@ trigger_variables:
   k_user_custom_api: "k_user_custom_api"
 
   # For OCPP trigger testing using IAMMeter.
-  # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'available'] }}"
-  charger_connected_rc: "{{ ['on', 'preparing', 'sae'] }}"
+  # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec', 'available'] }}"
+  charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
+  ev_at_home_rc: "{{ ['home', 'on'] }}"
 
   chargeControlApiSelected: !input select_charge_control_api
 
@@ -877,7 +890,7 @@ conditions:
   - condition: template
     value_template: >
       {% if has_value(e_evCarLocation) %}
-        {{ is_state(e_evCarLocation, 'home') }}
+        {{ states(e_evCarLocation) | lower in ev_at_home_rc }}
       {% else %}
         {{ true }}
       {% endif %}
@@ -912,33 +925,33 @@ actions:
       e_evCarWakeUp: "{{ chargeControlApi[k_ev_wake_up] }}"
       e_evCarForceUpdateHa: "{{ chargeControlApi[k_ev_status_update] }}"
 
+  # Wake up Tesla.
   - if:
       - condition: template
         value_template: "{{ has_value(e_evCarWakeUp) }}"
     then:
-      # Wake up Tesla.
       - action: button.press
         data: {}
         target:
           entity_id: "{{ e_evCarWakeUp }}"
       - delay: "{{ wait_car_wakeup }}"
 
+  # Get the latest data from Tesla to update HA.
   - if:
       - condition: template
         value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
     then:
-      # Get the latest data from Tesla to update HA.
       - action: button.press
         data: {}
         target:
           entity_id: "{{ e_evCarForceUpdateHa }}"
-      - delay: "{{ wait_command_execute }}"
+      - delay: "{{ wait_force_update }}"
 
   # Sanity check in case of manual run.
   # Do not manually run this script if car is not at home, because it affects car charging anywhere.
   - if:
       - condition: template
-        value_template: "{{ has_value(e_evCarLocation) and states(e_evCarLocation) != 'home' }}"
+        value_template: "{{ has_value(e_evCarLocation) and not states(e_evCarLocation) | lower in ev_at_home_rc }}"
     then:
       - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
 
@@ -952,9 +965,7 @@ actions:
   # If set daily car charge limit is toggled on and charge car based on weather is enabled, charge limit will be adjusted to the highest limit set within the rainy forecast period taking into account the car charge limit on bad weather setting.
   #
   # If charge car based on weather is enabled, daily car charge limit and weather provider settings must be configured.
-
   - choose:
-
     - conditions:
         - alias: "If set daily car charge limit on start up"
           condition: template
@@ -1060,7 +1071,7 @@ actions:
               data: {}
               target:
                 entity_id: "{{ e_evCarForceUpdateHa }}"
-            - delay: "{{ wait_command_execute }}"
+            - delay: "{{ wait_force_update }}"
 
     # Don't set daily car charge limit, so just copy charge limit from API if available. Otherwise publish_car_charge_limit must be set by user.
     default:
@@ -1078,7 +1089,9 @@ actions:
   #####################################
   - repeat:
 
+      #####################################
       # Only start charging when following conditions are met, otherwise exit script.
+      #####################################
       while:
         - condition: and
           conditions:
@@ -1107,9 +1120,9 @@ actions:
             #     - "Preparing"
             #     - "Charging"
 
-            - alias: "Continue if charger is plugged in"
+            - alias: "Continue if charger is plugged in or charging"
               condition: template
-              value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_and_charging_rc }}"
+              value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_or_charging_rc }}"
 
             - alias: "Continue if battery is below charge limit"
               condition: template
@@ -1140,7 +1153,9 @@ actions:
 
       sequence:
 
+        #####################################
         # Switch on charger before calculating power usage. Accuracy depends on rate of main_power_net update.
+        #####################################
         - if:
             - alias: "If looping for the first time in while loop"
               condition: template
@@ -1189,6 +1204,7 @@ actions:
                     value: "{{ initial_charge_current }}"
                   target:
                     entity_id: "{{ e_carChargingAmps }}"
+            - delay: "{{ wait_current_change }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
             - if:
@@ -1199,7 +1215,7 @@ actions:
                   data: {}
                   target:
                     entity_id: "{{ e_evCarForceUpdateHa }}"
-                - delay: "{{ wait_command_execute }}"
+                - delay: "{{ wait_force_update }}"
 
             # Tesla Fleet API does not have force update button, so should be ok to poll once here for everything.
             - if:
@@ -1217,8 +1233,11 @@ actions:
                 - condition: template
                   value_template: "{{ useBleMqttApi }}"
               then:
-                - delay: "{{ wait_ble_update }}"
+                - delay: "{{ wait_ble_charging_state }}"
 
+        #####################################
+        # Calculate new charging current
+        #####################################
         - variables:
             # Minimum charge current
             chargerMinCurrent: >
@@ -1275,6 +1294,9 @@ actions:
             #    {{ false }}
             #  {% endif %}
 
+        #####################################
+        # Change charging current if required
+        #####################################
         - choose:
 
           - conditions:
@@ -1291,7 +1313,7 @@ actions:
                     data: {}
                     target:
                       entity_id: "{{ e_evCarForceUpdateHa }}"
-                  - delay: "{{ wait_command_execute }}"
+                  - delay: "{{ wait_force_update }}"
               - stop: "Exiting script due to charger turned off manually or automatically by car when charge limit reached."
                 # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
                 # Cannot get response_variable to work. Needs to be key/value pair?
@@ -1329,6 +1351,7 @@ actions:
                       value: "{{ newChargeCurrent }}"
                     target:
                       entity_id: "{{ e_carChargingAmps }}"
+              - delay: "{{ wait_current_change }}"
 
           default:
             - alias: "Do nothing since new current is same as old"
@@ -1351,7 +1374,7 @@ actions:
               data: {}
               target:
                 entity_id: "{{ e_evCarForceUpdateHa }}"
-            - delay: "{{ wait_command_execute }}"
+            - delay: "{{ wait_force_update }}"
 
   #####################################
   # Exit script
@@ -1390,7 +1413,7 @@ actions:
               value: "{{ 0 }}"
             target:
               entity_id: "{{ e_carChargingAmps }}"
-      - delay: "{{ wait_command_execute }}"
+      - delay: "{{ wait_current_change }}"
 
       - action: switch.turn_off
         data: {}
@@ -1407,4 +1430,4 @@ actions:
         data: {}
         target:
           entity_id: "{{ e_evCarForceUpdateHa }}"
-      - delay: "{{ wait_command_execute }}"
+      - delay: "{{ wait_force_update }}"

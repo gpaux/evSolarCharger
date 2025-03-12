@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta20  12/3/2025
+-   Fixed Tesla BLE MQTT API incorrect entity for presence detection.
+-   Tesla BLE MQTT needs 110 seconds to register change after switching on charger.
+
 v3.0beta19  11/3/2025
 -   Fixed Tesla custom API trigger issue.
 -   Tidied code.
