@@ -861,6 +861,7 @@ variables:
     k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
     k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence_bc"
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
+    k_ev_wake_up_sensor: "binary_sensor.tesla_ble_{{ bleVinId }}_awake"
     k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
 
   e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
@@ -910,12 +911,16 @@ actions:
       e_evCarChargeLimit: "{{ chargeControlApi[k_ev_charge_limit] }}"
       e_evCarLocation: "{{ chargeControlApi[k_ev_home_tracker] }}"
       e_evCarWakeUp: "{{ chargeControlApi[k_ev_wake_up] }}"
+      e_evCarWakeUpSensor: "{{ chargeControlApi[k_ev_wake_up_sensor] }}"
       e_evCarForceUpdateHa: "{{ chargeControlApi[k_ev_status_update] }}"
 
-  # Wake up Tesla.
+  # Wake up Tesla if not waken up already.
   - if:
       - condition: template
         value_template: "{{ has_value(e_evCarWakeUp) }}"
+      - condition: state
+        entity_id:     "{{ e_evCarWakeUpSensor }}"
+        state: "off"
     then:
       - action: button.press
         data: {}
