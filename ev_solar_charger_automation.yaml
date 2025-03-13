@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta20).
+    Use OCPP or EV specific API to charge EV from excess solar and weather forecast (v3.0beta21).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -99,6 +99,20 @@ blueprint:
         The waiting period should be equal to the sensor update interval.
           * Default:  60
       default: 60
+      selector:
+        number:
+          min: 1
+          max: 600
+          unit_of_measurement: second
+          mode: box
+
+    wait_status_update:
+      name: Wait status update
+      description: >
+        Specify in seconds to wait for status update after issuing command to refresh status in HA.
+        Try 10 seconds if 5 is not enough for Tesla BLE MQTT API.
+          * Default:  5
+      default: 5
       selector:
         number:
           min: 1
@@ -511,7 +525,7 @@ blueprint:
           * OCPP:         ***Not defined***
           * Tesla Custom: device_tracker.location_tracker
           * Tesla Fleet:  device_tracker.location
-          * Tesla BLE:    ***Not defined*** (binary_sensor.tesla_ble_vin_presence)
+          * Tesla BLE:    device_tracker.tesla_ble_vin_presence_bc (Enable in Settings > Devices & services > MQTT > Entities)
           * User custom:  ***Not defined***
       default: device_tracker.not_defined
       selector:
@@ -541,7 +555,7 @@ blueprint:
           * OCPP:         ***Not defined***
           * Tesla Custom: button.force_data_update
           * Tesla Fleet:  ***Not defined*** (See [vehicle sleep](https://www.home-assistant.io/integrations/tesla_fleet/#vehicle-sleep) for [polling](https://www.home-assistant.io/common-tasks/general/#defining-a-custom-polling-interval) and [cost](https://alerts.home-assistant.io/alerts/tesla_fleet/).)
-          * Tesla BLE:    ***Not defined*** (button.tesla_ble_vin_force_update_all)
+          * Tesla BLE:    button.tesla_ble_vin_force_update_charge (Enable in Settings > Devices & services > MQTT > Entities)
           * User custom:  ***Not defined***
       default: button.not_defined
       selector:
@@ -549,9 +563,122 @@ blueprint:
           domain: button
 
 ###############################################################################
-# Only one Blueprint can run at any one time
+# Triggers
+# Note:
+# - Tesla triggers do not update often due to infrequent polling.
 ###############################################################################
-mode: single
+# Trigger variables must be defined here because triggers and conditions do not have access to global variables at time of trigger.
+# Trigger variables are global variables.
+trigger_variables:
+  k_tesla_custom_api: "k_tesla_custom_api"
+  k_tesla_fleet_api: "k_tesla_fleet_api"
+  k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
+  k_ocpp_charger_api: "k_ocpp_charger_api"
+  k_user_custom_api: "k_user_custom_api"
+
+  chargeControlApiSelected: !input select_charge_control_api
+  useTeslaCustomApi: "{{ chargeControlApiSelected == k_tesla_custom_api }}"
+  useTeslaFleetApi: "{{ chargeControlApiSelected == k_tesla_fleet_api }}"
+  useBleMqttApi: "{{ chargeControlApiSelected == k_tesla_blemqtt_api }}"
+  useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
+
+  i_teslaCarName: !input tesla_car_name
+  teslaCarName: >
+    {% if i_teslaCarName == "" %}
+      {{ i_teslaCarName }}
+    {% else %}
+      {{ i_teslaCarName | lower }}_
+    {% endif %}
+  i_bleVinId: !input ble_vin_id
+  bleVinId: "{{ i_bleVinId | lower }}"
+  i_ocppChargerName: !input ocpp_charger_name
+  ocppChargerName: "{{ i_ocppChargerName | lower }}"
+
+  i_evCarLocation: !input car_location_tracker
+  e_evCarLocation: >
+    {% if useTeslaCustomApi %}
+      device_tracker.{{ teslaCarName }}location_tracker
+    {% elif useTeslaFleetApi %}
+      device_tracker.{{ teslaCarName }}location
+    {% elif useBleMqttApi %}
+      device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
+    {% else %}
+      {{ i_evCarLocation }}
+    {% endif %}
+
+  i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
+  e_carChargerPluggedIn: >
+    {% if useTeslaCustomApi %}
+      binary_sensor.{{ teslaCarName }}charger
+    {% elif useTeslaFleetApi %}
+      binary_sensor.{{ teslaCarName }}charge_cable
+    {% elif useBleMqttApi %}
+      sensor.tesla_ble_{{ bleVinId }}_charge_cable
+    {% elif useOcppApi %}
+      sensor.{{ ocppChargerName }}_status_connector
+    {% else %}
+      {{ i_carChargerPluggedIn }}
+    {% endif %}
+
+  #####################################
+  # API return codes
+  #####################################
+  # Tesla Custom API entities
+  # binary_sensor.charger: on, off
+  # binary_sensor.charging: on, off
+
+  # Tesla Fleet API entities
+  # binary_sensor.charge_cable: on, off
+  # sensor.charging: starting, charging, stopped, complete, disconnected, no_power
+
+  # BLE entities
+  # sensor.tesla_ble_vin_charge_cable: No, SAE, IEC
+  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
+  # binary_sensor.tesla_ble_vin_presence: on=home, off=away (sensor not 100% accurate)
+
+  # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
+  # Available (no EV connected)
+  # Preparing (EV plugged in but not yet charging)
+  # Charging (active charging session)
+  # Finishing (charging session ending)
+
+  # For OCPP trigger testing using IAMMeter.
+  # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec', 'available'] }}"
+  charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
+  charger_charging_rc: "{{ ['on', 'charging'] }}"
+
+  # Note: OCPP use single sensor to indicate plugged in and charging
+  # Should remove 'available' in production code, left here for IAMMeter testing only.
+  charger_connected_or_charging_rc: "{{ charger_connected_rc + charger_charging_rc + ['available'] }}"
+
+  ev_at_home_rc: "{{ ['home'] }}"
+
+triggers:
+
+  # Trigger action if just plugged in.
+  - trigger: template
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
+
+  # Trigger action at elevation after sunrise.
+  - trigger: numeric_state
+    entity_id: sun.sun
+    attribute: elevation
+    above: !input sunrise_elevation_start_trigger
+
+conditions:
+
+  # Car must be at location. OCPP charger will know when it is plugged in at location.
+  - condition: template
+    value_template: >
+      {% if has_value(e_evCarLocation) %}
+        {{ states(e_evCarLocation) | lower in ev_at_home_rc }}
+      {% else %}
+        {{ true }}
+      {% endif %}
+
+  # Charger must be plugged in.
+  - condition: template
+    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
 
 ###############################################################################
 # Global variables
@@ -584,15 +711,9 @@ variables:
   # Wait in seconds after setting car charge limit.
   wait_charge_limit: 5
 
-  # Wait in seconds after getting status to update HA.
-  wait_force_update: 5
-  
   # Time to wait in seconds for command to execute after sending command.
   wait_command_execute: 5
   #wait_command_execute_str: "00:00:{{ wait_command_execute }}"
-
-  # BLE seemed to require longer update time
-  wait_ble_charging_state: 120
 
   # Valid charge limit range for Tesla API, otherwise will get following error,
   # Error: Value 0.0 for number.charge_limit is outside valid range 50 - 100
@@ -602,6 +723,10 @@ variables:
   #####################################
   # Inputs
   #####################################
+  # Wait in seconds after issuing update status command to update HA. 
+  # Extra delay required for BLE MQTT to register change in charging state. Need minimum 8 seconds for Tesla BLE.
+  wait_force_update: !input wait_status_update
+
   carChargerVoltage: !input charger_voltage
   carChargerMaxCurrent: !input charger_max_current
 
@@ -685,7 +810,15 @@ variables:
   # https://community.home-assistant.io/t/how-to-use-if-then-statements-to-create-dictionary-variables-in-scripts/688152
   # https://community.home-assistant.io/t/return-a-variable-which-is-a-dictionary-in-script-to-automation/796744/5
   # Dictionaries can be defined here but not accessed here!
-  chargeControlApiSelected: !input select_charge_control_api
+  k_charger_plugged_in: "k_charger_plugged_in"
+  k_charger_onoff_switch: "k_charger_onoff_switch"
+  k_charger_charging: "k_charger_charging"
+  k_charger_current: "k_charger_current"
+  k_ev_battery_level: "k_ev_battery_level"
+  k_ev_charge_limit: "k_ev_charge_limit"
+  k_ev_home_tracker: "k_ev_home_tracker"
+  k_ev_wake_up: "k_ev_wake_up"
+  k_ev_status_update: "k_ev_status_update"
 
   i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
   i_carChargerSwitch: !input car_switch_charger
@@ -697,29 +830,6 @@ variables:
   i_evCarWakeUp: !input car_button_wake_up
   i_evCarForceUpdateHa: !input car_button_forceupdate_ha
 
-  k_tesla_custom_api: "k_tesla_custom_api"
-  k_tesla_fleet_api: "k_tesla_fleet_api"
-  k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
-  k_ocpp_charger_api: "k_ocpp_charger_api"
-  k_user_custom_api: "k_user_custom_api"
-
-  k_charger_plugged_in: "k_charger_plugged_in"
-  k_charger_onoff_switch: "k_charger_onoff_switch"
-  k_charger_charging: "k_charger_charging"
-  k_charger_current: "k_charger_current"
-  k_ev_battery_level: "k_ev_battery_level"
-  k_ev_charge_limit: "k_ev_charge_limit"
-  k_ev_home_tracker: "k_ev_home_tracker"
-  k_ev_wake_up: "k_ev_wake_up"
-  k_ev_status_update: "k_ev_status_update"
-
-  i_teslaCarName: !input tesla_car_name
-  teslaCarName: >
-    {% if i_teslaCarName == "" %}
-      {{ i_teslaCarName }}
-    {% else %}
-      {{ i_teslaCarName | lower }}_
-    {% endif %}
   teslaCustomApi:
     k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charger"
     k_charger_onoff_switch: "switch.{{ teslaCarName }}charger"
@@ -731,7 +841,6 @@ variables:
     k_ev_wake_up: "button.{{ teslaCarName }}wake_up"
     k_ev_status_update: "button.{{ teslaCarName }}force_data_update"
 
-  useTeslaFleetApi: "{{ chargeControlApiSelected == k_tesla_fleet_api }}"
   teslaFleetApi:
     k_charger_plugged_in: "binary_sensor.{{ teslaCarName }}charge_cable"
     k_charger_onoff_switch: "switch.{{ teslaCarName }}charge"
@@ -743,9 +852,6 @@ variables:
     k_ev_wake_up: "button.{{ teslaCarName }}wake"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
 
-  useBleMqttApi: "{{ chargeControlApiSelected == k_tesla_blemqtt_api }}"
-  i_bleVinId: !input ble_vin_id
-  bleVinId: "{{ i_bleVinId | lower }}"
   teslaBleMqttApi:
     k_charger_plugged_in: "sensor.tesla_ble_{{ bleVinId }}_charge_cable"
     k_charger_onoff_switch: "switch.tesla_ble_{{ bleVinId }}_charger"
@@ -753,15 +859,10 @@ variables:
     k_charger_current: "number.tesla_ble_{{ bleVinId }}_charging_current"
     k_ev_battery_level: "sensor.tesla_ble_{{ bleVinId }}_battery_level"
     k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
-    #k_ev_home_tracker: "binary_sensor.tesla_ble_{{ bleVinId }}_presence"
-    k_ev_home_tracker: "{{ i_evCarLocation }}"
+    k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence_bc"
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
-    #k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_all"
-    k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
+    k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
 
-  useOcppApi: "{{ chargeControlApiSelected == k_ocpp_charger_api }}"
-  i_ocppChargerName: !input ocpp_charger_name
-  ocppChargerName: "{{ i_ocppChargerName | lower }}"
   e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
   ocppChargerApi:
     k_charger_plugged_in: "sensor.{{ ocppChargerName }}_status_connector"
@@ -784,120 +885,6 @@ variables:
     k_ev_home_tracker: "{{ i_evCarLocation }}"
     k_ev_wake_up: "{{ i_evCarWakeUp }}"
     k_ev_status_update: "{{ i_evCarForceUpdateHa }}"
-
-  #####################################
-  # API return codes
-  #####################################
-  # Tesla Custom API entities
-  # binary_sensor.charger: on, off
-  # binary_sensor.charging: on, off
-
-  # Tesla Fleet API entities
-  # binary_sensor.charge_cable: on, off
-  # sensor.charging: starting, charging, stopped, complete, disconnected, no_power
-
-  # BLE entities
-  # sensor.tesla_ble_vin_charge_cable: No, SAE, IEC
-  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
-  # binary_sensor.tesla_ble_vin_presence: on=home, off=away (sensor not 100% accurate)
-
-  # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
-  # Available (no EV connected)
-  # Preparing (EV plugged in but not yet charging)
-  # Charging (active charging session)
-  # Finishing (charging session ending)
-
-  charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
-  charger_charging_rc: "{{ ['on', 'charging'] }}"
-
-  # Note: OCPP use single sensor to indicate plugged in and charging
-  # Should remove 'available' in production code, left here for IAMMeter testing only.
-  charger_connected_or_charging_rc: "{{ charger_connected_rc + charger_charging_rc + ['available'] }}"
-
-  ev_at_home_rc: "{{ ['home', 'on'] }}"
-
-###############################################################################
-# Triggers
-# Note:
-# - Tesla triggers do not update often due to infrequent polling.
-###############################################################################
-# Trigger variables must be defined here because triggers and conditions do not have access to global variables at time of trigger.
-trigger_variables:
-  k_tesla_custom_api: "k_tesla_custom_api"
-  k_tesla_fleet_api: "k_tesla_fleet_api"
-  k_tesla_blemqtt_api: "k_tesla_blemqtt_api"
-  k_ocpp_charger_api: "k_ocpp_charger_api"
-  k_user_custom_api: "k_user_custom_api"
-
-  # For OCPP trigger testing using IAMMeter.
-  # charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec', 'available'] }}"
-  charger_connected_rc: "{{ ['on', 'preparing', 'sae', 'iec'] }}"
-  ev_at_home_rc: "{{ ['home', 'on'] }}"
-
-  chargeControlApiSelected: !input select_charge_control_api
-
-  i_teslaCarName: !input tesla_car_name
-  teslaCarName: >
-    {% if i_teslaCarName == "" %}
-      {{ i_teslaCarName }}
-    {% else %}
-      {{ i_teslaCarName | lower }}_
-    {% endif %}
-  i_bleVinId: !input ble_vin_id
-  bleVinId: "{{ i_bleVinId | lower }}"
-  i_ocppChargerName: !input ocpp_charger_name
-  ocppChargerName: "{{ i_ocppChargerName | lower }}"
-
-  i_evCarLocation: !input car_location_tracker
-  e_evCarLocation: >
-    {% if chargeControlApiSelected == k_tesla_custom_api %}
-      device_tracker.{{ teslaCarName }}location_tracker
-    {% elif chargeControlApiSelected == k_tesla_fleet_api %}
-      device_tracker.{{ teslaCarName }}location
-    {% else %}
-      {{ i_evCarLocation }}
-    {% endif %}
-
-  i_carChargerPluggedIn: !input car_sensor_charger_pluggedin
-  e_carChargerPluggedIn: >
-    {% if chargeControlApiSelected == k_tesla_custom_api %}
-      binary_sensor.{{ teslaCarName }}charger
-    {% elif chargeControlApiSelected == k_tesla_fleet_api %}
-      binary_sensor.{{ teslaCarName }}charge_cable
-    {% elif chargeControlApiSelected == k_tesla_blemqtt_api %}
-      sensor.tesla_ble_{{ bleVinId }}_charge_cable
-    {% elif chargeControlApiSelected == k_ocpp_charger_api %}
-      sensor.{{ ocppChargerName }}_status_connector
-    {% else %}
-      {{ i_carChargerPluggedIn }}
-    {% endif %}
-
-triggers:
-
-  # Trigger action if just plugged in.
-  - trigger: template
-    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
-
-  # Trigger action at elevation after sunrise.
-  - trigger: numeric_state
-    entity_id: sun.sun
-    attribute: elevation
-    above: !input sunrise_elevation_start_trigger
-
-conditions:
-
-  # Car must be at location. OCPP charger will know when it is plugged in at location.
-  - condition: template
-    value_template: >
-      {% if has_value(e_evCarLocation) %}
-        {{ states(e_evCarLocation) | lower in ev_at_home_rc }}
-      {% else %}
-        {{ true }}
-      {% endif %}
-
-  # Charger must be plugged in.
-  - condition: template
-    value_template: "{{ states(e_carChargerPluggedIn) | lower in charger_connected_rc }}"
 
 ###############################################################################
 # Actions
@@ -1207,6 +1194,8 @@ actions:
             - delay: "{{ wait_current_change }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
+            # Tesla BLE MQTT took 110 sec for force_update_all, but only 13 sec for force_update_charge.
+            #
             - if:
                 - condition: template
                   value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
@@ -1227,13 +1216,6 @@ actions:
                     entity_id:
                       - "{{ e_isCarCharging }}"
                 - delay: "{{ wait_command_execute }}"
-
-            # Extra delay required for BLE MQTT to register change in charging state.
-            - if:
-                - condition: template
-                  value_template: "{{ useBleMqttApi }}"
-              then:
-                - delay: "{{ wait_ble_charging_state }}"
 
         #####################################
         # Calculate new charging current
@@ -1431,3 +1413,8 @@ actions:
         target:
           entity_id: "{{ e_evCarForceUpdateHa }}"
       - delay: "{{ wait_force_update }}"
+
+###############################################################################
+# Only one Blueprint can run at any one time
+###############################################################################
+mode: single

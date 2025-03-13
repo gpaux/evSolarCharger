@@ -1,6 +1,12 @@
 EV Solar Charger
 ================
 
+v3.0beta21  12/3/2025
+-   Added new field: wait status update - time to wait after issuing force update command to update HA.
+-   Tesla BLE MQTT API default to use button.tesla_vin_force_update_charge for stability. Suggest to set wait status update to 10 seconds.
+-   Tesla BLE MQTT API default to use device_tracker.tesla_ble_vin_presence_bc
+-   Tidied code.
+
 v3.0beta20  12/3/2025
 -   Fixed Tesla BLE MQTT API incorrect entity for presence detection.
 -   Tesla BLE MQTT needs 110 seconds to register change after switching on charger.
