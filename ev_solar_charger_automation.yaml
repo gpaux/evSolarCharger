@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta22).
+    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta23).
     See https://github.com/flashg1/evSolarCharger for details.
   domain: automation
 
@@ -452,6 +452,9 @@ blueprint:
       default: binary_sensor.not_defined
       selector:
         entity:
+          domain:
+            - sensor
+            - binary_sensor
 
     car_switch_charger:
       name: Charger on/off switch
@@ -479,6 +482,9 @@ blueprint:
       default: binary_sensor.not_defined
       selector:
         entity:
+          domain:
+            - sensor
+            - binary_sensor
 
     car_number_charging_amps:
       name: Charger current
@@ -877,6 +883,7 @@ variables:
     k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
     k_ev_status_update: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
 
+  e_ocppChargerId: "sensor.{{ ocppChargerName }}_id"
   e_ocppChargerTransactionId: "sensor.{{ ocppChargerName }}_transaction_id"
   ocppChargerApi:
     k_charger_plugged_in: "sensor.{{ ocppChargerName }}_status_connector"
@@ -930,7 +937,7 @@ actions:
       e_evCarForceUpdateHa: "{{ chargeControlApi[k_ev_status_update] }}"
 
   #####################################
-  # Wake up car
+  # Init car and charger
   #####################################
   - if:
       - condition: template
@@ -960,6 +967,27 @@ actions:
         value_template: "{{ has_value(e_evCarLocation) and not states(e_evCarLocation) | lower in rc_ev_at_home }}"
     then:
       - stop: "Exiting script because car is not at home, otherwise the script will affect car if charging elsewhere."
+
+  # https://www.ampcontrol.io/ocpp-guide/how-to-use-smart-charging-with-ocpp#:~:text=This%20is%20used%20to%20stack,manner%20if%20connectivity%20is%20lost.
+  - alias: "Get charge profile max stack level if using OCPP. This stack level will be used to override all others."
+    if:
+      - condition: template
+        value_template: "{{ useOcppApi }}"
+    then:
+      - action: ocpp.get_configuration
+        data:
+          devid: "{{ states(e_ocppChargerId) }}"
+          ocpp_key: "ChargeProfileMaxStackLevel"
+        response_variable: ocpp_max_stack_level
+
+  - variables:
+
+      ocppStackLevel: >
+        {% if useOcppApi %}
+          {{ ocpp_max_stack_level['value'] | int }}
+        {% else %}
+          {{ 0 }}
+        {% endif %}
 
   #####################################
   # Set car charge limit on start up
@@ -1193,7 +1221,7 @@ actions:
                       {
                         "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
                         "chargingProfileId": 1,
-                        "stackLevel": 0,
+                        "stackLevel": {{ ocppStackLevel }},
                         "chargingProfilePurpose": "TxProfile",
                         "chargingProfileKind": "Relative",
                         "chargingSchedule": {
@@ -1348,7 +1376,7 @@ actions:
                         {
                           "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
                           "chargingProfileId": 1,
-                          "stackLevel": 0,
+                          "stackLevel": {{ ocppStackLevel }},
                           "chargingProfilePurpose": "TxProfile",
                           "chargingProfileKind": "Relative",
                           "chargingSchedule": {
@@ -1408,7 +1436,7 @@ actions:
                 {
                   "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
                   "chargingProfileId": 1,
-                  "stackLevel": 0,
+                  "stackLevel": {{ ocppStackLevel }},
                   "chargingProfilePurpose": "TxProfile",
                   "chargingProfileKind": "Relative",
                   "chargingSchedule": {
