@@ -1,6 +1,10 @@
 EV Solar Charger
 ================
 
+v3.0beta24  15/3/2025
+-   Removed default tracker for Tesla BLE MQTT API since BLE charge controller is at location.
+-   Updated doc.
+
 v3.0beta23  14/3/2025
 -   Get OCPP ChargeProfileMaxStackLevel to override default and lower level charge profiles to set charge current. Thanks @BJReplay.
 
