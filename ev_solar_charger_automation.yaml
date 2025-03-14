@@ -1236,10 +1236,10 @@ actions:
                       - "{{ e_isCarCharging }}"
                 - delay: "{{ wait_fleet_api_update }}"
 
-            # Wait for charging status update
             # BLE: Need minimum wait_charging_status_update=16, wait_force_update=5. Charging status took 27 sec to register after sending switch on charger command.
             # Others: wait_charging_status_update=0, wait_force_update=5
-            - delay: !input wait_charging_status_update
+            - alias: "Wait charging status update" 
+              delay: !input wait_charging_status_update
 
         #####################################
         # Calculate new charging current
