@@ -660,7 +660,7 @@ trigger_variables:
 
   # BLE entities
   # sensor.tesla_ble_vin_charge_cable: No, SAE, IEC
-  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete, Charging, Stopped
+  # sensor.tesla_ble_vin_charging_state: Disconnected, Complete (reached charge limit but charger is not turned off), Charging, Stopped (charger turned off)
   # binary_sensor.tesla_ble_vin_presence: on=home, off=away (sensor not 100% accurate)
 
   # See OCPP spec v1.6j ChargePointStatus on page 77, ie. sensor.charger_status_connector
@@ -1464,11 +1464,13 @@ actions:
               entity_id: "{{ e_carChargingAmps }}"
       - delay: "{{ wait_current_change }}"
 
-      - action: switch.turn_off
-        data: {}
-        target:
-          entity_id: "{{ e_carChargerSwitch }}"
-      - delay: "{{ wait_charger_off }}"
+  # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete.
+  - alias: "Always turn off charger on exit"
+    action: switch.turn_off
+    data: {}
+    target:
+      entity_id: "{{ e_carChargerSwitch }}"
+  - delay: "{{ wait_charger_off }}"
 
   # Get the latest data from Tesla to update HA before exiting script.
   - if:

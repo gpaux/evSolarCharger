@@ -3,6 +3,7 @@ EV Solar Charger
 
 v3.0beta24  15/3/2025
 -   Removed default tracker for Tesla BLE MQTT API since BLE charge controller is at location.
+-   Always turn off charger on exit. Tesla BLE MQTT API not switching off charger on exit after reaching charge limit.
 -   Updated doc.
 
 v3.0beta23  14/3/2025
