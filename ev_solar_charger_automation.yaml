@@ -16,8 +16,15 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta24).
+    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta25).
     See https://github.com/flashg1/evSolarCharger for details.
+
+
+    The following configs are required as a minimum for a functional Blueprint:
+      * Main power net
+      * Charger voltage and maximum current
+      * Charge control API selection
+      * Car or charger unique identifier
   domain: automation
 
   #####################################
@@ -132,7 +139,7 @@ blueprint:
       name: Wait charging status update
       description: >
         Specify in seconds to wait for charging status update in HA after switching on charger.
-        Tested ok with 16 seconds for Tesla BLE MQTT API, but suggest to try 20 seconds.
+        Tested ok with minimum 16 seconds for Tesla BLE MQTT API, but suggest to try 20 seconds.
           * Default:  0
       default: 0
       selector:
@@ -370,9 +377,9 @@ blueprint:
         Select [OCPP Charger API](https://github.com/lbbrhzn/ocpp) to control an OCPP compliant charger to charge a EV (tested with [OCPP simulator](https://github.com/lewei50/iammeter-simulator) only),
         or [Tesla Custom API](https://github.com/alandtse/tesla),
         or [Tesla Fleet API](https://www.home-assistant.io/integrations/tesla_fleet) (not tested),
-        or [Tesla BLE MQTT API](https://github.com/tesla-local-control/tesla_ble_mqtt_docker) (not tested),
+        or [Tesla BLE MQTT API](https://github.com/tesla-local-control/tesla_ble_mqtt_docker),
         or select user custom API to specify your own entities below.
-        Entities that are not defined for the API can be manually entered below.
+        Entities that are marked as ***Not defined*** for the selected API can be manually entered below.
 
 
         Note: ***The untested APIs above might not work with this Blueprint.***
@@ -401,7 +408,7 @@ blueprint:
     tesla_car_name:
       name: Tesla car name
       description: >
-        Enter the Tesla car name for use with Tesla Custom API or Tesla Fleet API.
+        Enter the Tesla car name for use with ***Tesla Custom API*** or ***Tesla Fleet API***.
         Tesla car name combines with base entity name to form a unique entity identifier.
         No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  (blank, no quotes)
@@ -413,9 +420,9 @@ blueprint:
     # BLE configs
     #####################################
     ble_vin_id:
-      name: BLE (Bluetooth Low Energy) VIN ID
+      name: Tesla BLE (Bluetooth Low Energy) VIN ID
       description: >
-        Enter the BLE VIN ID for use with Tesla BLE MQTT API.
+        Enter the Tesla BLE VIN ID for use with ***Tesla BLE MQTT API***.
         BLE VIN ID combines with base entity name to form a unique entity identifier.
         No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  vin
@@ -429,7 +436,7 @@ blueprint:
     ocpp_charger_name:
       name: OCPP (Open Charge Point Protocol) charger name
       description: >
-        Enter the OCPP charger name as defined on your OCPP server for use with OCPP charger API.
+        Enter the OCPP charger name as defined on your OCPP server for use with ***OCPP charger API***.
         OCPP charger name combines with base entity name to form a unique entity identifier.
         No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  charger
@@ -1296,8 +1303,11 @@ actions:
                 {{ 0 }}
               {% endif %}
 
+            # Feedback loop power sensor
+            feedbackLoopPower: "{{ states(e_mainPowerNet) | float(0) }}"
+
             # Net power from all sources (default 0 set by float(0) if cannot convert to float).
-            allPowerNet: "{{ states(e_mainPowerNet) | float(0) + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
+            allPowerNet: "{{ feedbackLoopPower + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
 
             # This can be greater than carChargerMaxCurrent.
             # +ve => importing amp from grid, -ve => exporting amp to grid
