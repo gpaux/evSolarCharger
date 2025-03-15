@@ -1,6 +1,11 @@
 EV Solar Charger
 ================
 
+v3.0beta25  15/3/2025
+-   For BLE MQTT API, check for charging status=complete and turn off charger.
+-   For Tesla custom API, do not send command to turn off charger if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
+-   Updated doc.
+
 v3.0beta24  15/3/2025
 -   Removed default tracker for Tesla BLE MQTT API since BLE charge controller is at location.
 -   Always turn off charger on exit. Tesla BLE MQTT API not switching off charger on exit after reaching charge limit.

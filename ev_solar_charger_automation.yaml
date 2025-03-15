@@ -67,7 +67,10 @@ blueprint:
       default: number.user_custom
       selector:
         entity:
-          domain: input_number
+          domain:
+            - input_number
+            - number
+            - sensor
 
     charger_max_current:
       name: Charger maximum current
@@ -178,6 +181,10 @@ blueprint:
       default: sensor.user_custom
       selector:
         entity:
+          domain:
+            - input_number
+            - number
+            - sensor
 
     toggle_secondary_power_source:
       name: Secondary power source toggle for night time charging
@@ -684,6 +691,9 @@ trigger_variables:
   # Note: OCPP use single sensor to indicate plugged in and charging
   # Should remove 'available' in production code, left here for IAMMeter testing only.
   rc_charger_connected_or_charging: "{{ rc_charger_connected + rc_charger_charging + ['available'] }}"
+
+  # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete
+  rc_charger_charging_or_completed: "{{ rc_charger_charging + ['complete'] }}"
 
   rc_ev_at_home: "{{ ['home'] }}"
 
@@ -1441,7 +1451,7 @@ actions:
   # Set 0 charging current and turn off charger if it is on or charging
   - if:
       - condition: template
-        value_template: "{{ states(e_isCarCharging) | lower in rc_charger_charging }}"
+        value_template: "{{ states(e_isCarCharging) | lower in rc_charger_charging_or_completed }}"
     then:
       - if:
           - condition: template
@@ -1474,14 +1484,15 @@ actions:
               entity_id: "{{ e_carChargingAmps }}"
       - delay: "{{ wait_current_change }}"
 
-  # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete.
-  - alias: "Always turn off charger on exit"
-    action: switch.turn_off
-    data: {}
-    target:
-      entity_id: "{{ e_carChargerSwitch }}"
-  - delay: "{{ wait_charger_off }}"
+      # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete, so need to turn off charger here.
+      - alias: "Turn off charger on exit"
+        action: switch.turn_off
+        data: {}
+        target:
+          entity_id: "{{ e_carChargerSwitch }}"
+      - delay: "{{ wait_charger_off }}"
 
+  # For Tesla custom API, do not send command to turn off charger here if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
   # Get the latest data from Tesla to update HA before exiting script.
   - if:
       - condition: template
