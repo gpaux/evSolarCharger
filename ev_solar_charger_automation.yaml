@@ -59,6 +59,17 @@ blueprint:
           unit_of_measurement: volt
           mode: box
 
+    charger_max_current:
+      name: Charger maximum current
+      description: Specify charger maximum current in Ampere.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 100
+          unit_of_measurement: amp
+          mode: box
+
     charger_min_current:
       name: Charger minimum current
       description: >
@@ -71,17 +82,6 @@ blueprint:
             - input_number
             - number
             - sensor
-
-    charger_max_current:
-      name: Charger maximum current
-      description: Specify charger maximum current in Ampere.
-      default: 15
-      selector:
-        number:
-          min: 5
-          max: 100
-          unit_of_measurement: amp
-          mode: box
 
     sunrise_elevation_start_trigger:
       name: Sunrise elevation start trigger
@@ -1130,6 +1130,9 @@ actions:
               target:
                 entity_id: "{{ e_evCarForceUpdateHa }}"
             - delay: "{{ wait_force_update }}"
+
+        - alias: "Wait charge limit update" 
+          delay: !input wait_charging_status_update
 
     # Don't set daily car charge limit, so just copy charge limit from API if available. Otherwise publish_car_charge_limit must be set by user.
     default:

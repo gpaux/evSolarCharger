@@ -3,6 +3,7 @@ EV Solar Charger
 
 v3.0beta25  15/3/2025
 -   For BLE MQTT API, check for charging status=complete and turn off charger.
+-   For BLE MQTT API, added same delay to wait for charge limit update.
 -   For Tesla custom API, do not send command to turn off charger if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
 -   Updated doc.
 
