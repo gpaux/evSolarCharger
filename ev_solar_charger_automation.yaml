@@ -178,7 +178,7 @@ blueprint:
         Toggle on to charge from secondary power source (eg. grid/battery) at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
         Toggle off to charge car during daytime only.
           * The default is off if not defined.
-      default: boolean.not_defined
+      default: boolean.user_custom
       selector:
         entity:
           domain: input_boolean
@@ -189,7 +189,7 @@ blueprint:
         Toggle on to stop charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
         Delayed by "Wait main power net update" value.
           * The default is off if not defined.
-      default: boolean.not_defined
+      default: boolean.user_custom
       selector:
         entity:
           domain: input_boolean
@@ -206,7 +206,7 @@ blueprint:
 
         Note: Requires car battery level sensor for this to work. Please toggle off this option if car battery level sensor is not available.
           * The default is off if not defined.
-      default: boolean.not_defined
+      default: boolean.user_custom
       selector:
         entity:
           domain: input_boolean
