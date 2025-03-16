@@ -567,7 +567,7 @@ blueprint:
           * Tesla Fleet:  device_tracker.[CarName_]location
           * Tesla BLE:    ***Not defined*** (binary_sensor.tesla_ble_[vin]_presence)
           * User custom:  ***Not defined***
-      default: device_tracker.user_custom
+      default: binary_sensor.user_custom
       selector:
         entity:
           domain:
