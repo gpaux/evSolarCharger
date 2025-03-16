@@ -16,7 +16,7 @@ blueprint:
 
   name: EV solar charger automation
   description: >
-    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta25).
+    Use OCPP and/or EV specific API to charge EV from excess solar and weather forecast (v3.0beta26).
     See https://github.com/flashg1/evSolarCharger for details.
 
 
@@ -565,7 +565,7 @@ blueprint:
           * OCPP:         Not required
           * Tesla Custom: device_tracker.[CarName_]location_tracker
           * Tesla Fleet:  device_tracker.[CarName_]location
-          * Tesla BLE:    Not required (device_tracker.tesla_ble_[vin]_presence_bc)
+          * Tesla BLE:    ***Not defined*** (binary_sensor.tesla_ble_[vin]_presence)
           * User custom:  ***Not defined***
       default: device_tracker.user_custom
       selector:
@@ -695,7 +695,7 @@ trigger_variables:
   # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete
   rc_charger_charging_or_completed: "{{ rc_charger_charging + ['complete'] }}"
 
-  rc_ev_at_home: "{{ ['home'] }}"
+  rc_ev_at_home: "{{ ['home', 'on'] }}"
 
 triggers:
 
@@ -1184,6 +1184,17 @@ actions:
             - alias: "Continue if charger is plugged in or charging"
               condition: template
               value_template: "{{ states(e_carChargerPluggedIn) | lower in rc_charger_connected_or_charging }}"
+
+            # For Tesla BLE, if car got disconnected and driven away before the next update, all sensors stayed the same except binary_sensor.tesla_ble_vin_presence.
+            # Unfortunately BLE Bluetooth beacon is unreliable, which means the charger and script can stop unintentionally if using binary_sensor.tesla_ble_vin_presence!
+            - alias: "Continue if using Tesla BLE and car is at home"
+              condition: template
+              value_template: >
+                {% if useBleMqttApi and has_value(e_evCarLocation) %}
+                  {{ states(e_evCarLocation) | lower in rc_ev_at_home }}
+                {% else %}
+                  {{ true }}
+                {% endif %}
 
             - alias: "Continue if battery is below charge limit"
               condition: template
