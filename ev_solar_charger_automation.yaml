@@ -570,7 +570,9 @@ blueprint:
       default: device_tracker.user_custom
       selector:
         entity:
-          domain: device_tracker
+          domain:
+            - device_tracker
+            - binary_sensor
 
     car_button_wake_up:
       name: EV button wake up (optional)
