@@ -1186,6 +1186,7 @@ actions:
               value_template: "{{ states(e_carChargerPluggedIn) | lower in rc_charger_connected_or_charging }}"
 
             # For Tesla BLE, if car got disconnected and driven away before the next update, all sensors stayed the same except binary_sensor.tesla_ble_vin_presence.
+            # binary_sensor.tesla_ble_vin_presence detected car was away after few minutes, and script tried to turn off charger before exiting, but still all sensors stayed the same.
             # Unfortunately BLE Bluetooth beacon is unreliable, which means the charger and script can stop unintentionally if using binary_sensor.tesla_ble_vin_presence!
             - alias: "Continue if using Tesla BLE and car is at home"
               condition: template
