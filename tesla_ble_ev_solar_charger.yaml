@@ -202,7 +202,7 @@ trigger_variables:
   i_bleVinId: !input ble_vin_id
   bleVinId: "{{ i_bleVinId | lower }}"
   
-  rc_charger_connected: "{{'sae'] }}"
+  rc_charger_connected: "{{ ['sae'] }}"
   rc_charger_charging: "{{ ['on'] }}"
   rc_charger_connected_or_charging: "{{ rc_charger_connected + rc_charger_charging }}"
 
