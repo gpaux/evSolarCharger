@@ -205,6 +205,10 @@ trigger_variables:
   rc_charger_connected: "{{ ['sae'] }}"
   rc_charger_charging: "{{ ['on'] }}"
   rc_charger_connected_or_charging: "{{ rc_charger_connected + rc_charger_charging }}"
+  
+  e_evCarLocation: {{ device_tracker.tesla_ble_{{ bleVinId }}_presence_bc }}
+  
+  rc_ev_at_home: "{{ ['home'] }}"
 
 triggers:
   # Trigger automation if start EV solar charger is pressed
@@ -213,8 +217,13 @@ triggers:
     
 conditions:
   # Car must be at home.
-  - condition: state
-    entity_id: device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
+  - condition: template
+    value_template: >
+      {% if has_value(e_evCarLocation) %}
+        {{ states(e_evCarLocation) | lower in rc_ev_at_home }}
+      {% else %}
+        {{ true }}
+      {% endif %}
     state: "home"
   # Car must be plugged at the charger at home.
   - condition: state
