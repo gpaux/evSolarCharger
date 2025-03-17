@@ -1,0 +1,703 @@
+###############################################################################
+# Disclaimer:
+#
+# Even though this automation has been created with care, the author cannot be
+# responsible for any damages caused by this automation.  Use at your own risk.
+#
+###############################################################################
+# Objective:
+# - Use Tesla BLE to charge EV from excess solar.
+#
+# History:
+# 3/16/2025 Simplification of EvSolarCHarger from flashg1 v3.0beta26.
+###############################################################################
+
+blueprint:
+
+  name: Tesla BLE EV solar charger automation
+  description: >
+    Use Tesla BLE to charge EV from excess solar and weather forecast (v0.0.1).
+
+    The following configs are required as a minimum for a functional Blueprint:
+      * Main power net
+      * Charger voltage and maximum current
+      * Car or charger unique identifier
+  domain: automation
+
+  #####################################
+  # Blueprint inputs
+  #####################################
+  input:
+
+    #####################################
+    # Main configs
+    #####################################
+    sensor_main_power_net:
+      name: Main power net
+      description: >
+        Sensor that expresses negative value in Watts for available power for charging car or positive value for consumed power.
+        This sensor is the feedback loop for adjusting power consumption.
+      default: sensor.main_power_net
+      selector:
+        entity:
+          domain: sensor
+
+    charger_voltage:
+      name: Charger voltage
+      description: >
+        Specify charger voltage in Volt.
+      default: 245
+      selector:
+        number:
+          min: 110
+          max: 750
+          unit_of_measurement: volt
+          mode: box
+
+    charger_max_current:
+      name: Charger maximum current
+      description: Specify charger maximum current in Ampere.
+      default: 48
+      selector:
+        number:
+          min: 5
+          max: 100
+          unit_of_measurement: amp
+          mode: box
+
+    charger_min_current:
+      name: Charger minimum current
+      description: >
+        Specify the minimum car charging current when there is not enough solar electricity (Settings > Devices & Services > Helpers > Create helper > Number).
+          * The default is 0A if not defined.
+      default: number.user_custom
+      selector:
+        entity:
+          domain:
+            - input_number
+            - number
+            - sensor
+
+    wait_main_power_net_update:
+      name: Wait main power net update
+      description: >
+        Specify in seconds how often to check "sensor_main_power_net".
+        The waiting period should be equal to the sensor update interval.
+          * Default:  30
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 600
+          unit_of_measurement: second
+          mode: box
+
+    wait_status_update:
+      name: Wait status update
+      description: >
+        Specify in seconds to wait for status update after issuing command to refresh status in HA.
+          * Default:  10
+      default: 19
+      selector:
+        number:
+          min: 1
+          max: 600
+          unit_of_measurement: second
+          mode: box
+
+    wait_charging_status_update:
+      name: Wait charging status update
+      description: >
+        Specify in seconds to wait for charging status update in HA after switching on charger.
+        Tested ok with minimum 16 seconds for Tesla BLE MQTT API, but suggest to try 20 seconds.
+          * Default:  0
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: second
+          mode: box
+
+    power_draw_skew:
+      name: Power draw skew
+      description: >
+        The skew shifts the power export/import curve left or right defining the range where power can fluctuate without causing charger current adjustment. 
+        The higher the skew, the less likely to import power and more likely to export power.
+        Skew should be kept between 0 and 1 inclusive.
+          * Lower range = P * Skew * (-1) - P/2
+          * Upper range = P * Skew * (-1) + P/2
+          * Where P = Charger voltage * 1 Amp
+        
+        Eg. Charger voltage = 230V, Skew = 0.3 => Lower range = -184W, Upper range = +46W
+          * Default:  0.3
+      default: 0.3
+      selector:
+        number:
+          min: 0
+          max: 1
+          mode: box
+
+    power_offset_from_zero:
+      name: Power offset for import from or export to secondary power source (eg. grid/battery)
+      description: >
+        Sensor to specify maximum power flow to or from secondary power source at all times (Settings > Devices & Services > Helpers > Create helper > Number or Template).
+        Set negative value to import from secondary power source, or positive value to export to secondary power source.
+        Suggest to set to 0 Watt to charge from solar only.
+          * The default is 0W if not defined.
+      default: sensor.user_custom
+      selector:
+        entity:
+          domain:
+            - input_number
+            - number
+            - sensor
+
+    toggle_secondary_power_source:
+      name: Secondary power source toggle for night time charging
+      description: >
+        Toggle on to charge from secondary power source (eg. grid/battery) at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Toggle off to charge car during daytime only.
+          * The default is off if not defined.
+      default: boolean.user_custom
+      selector:
+        entity:
+          domain: input_boolean
+          
+    toggle_stop_charger:
+      name: Stop charger toggle
+      description: >
+        Toggle on to stop charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
+        Delayed by "Wait main power net update" value.
+          * The default is off if not defined.
+      default: boolean.user_custom
+      selector:
+        entity:
+          domain: input_boolean
+        
+    #####################################
+    # BLE configs
+    #####################################
+    ble_vin_id:
+      name: Tesla BLE (Bluetooth Low Energy) VIN ID
+      description: >
+        Enter the Tesla BLE VIN ID for use with ***Tesla BLE MQTT API***.
+        BLE VIN ID combines with base entity name to form a unique entity identifier.
+        No need to define individual entities for this API unless they are marked as ***Not defined***.
+          * Default:  vin
+      default: "vin"
+      selector:
+        text:
+
+###############################################################################
+# Triggers and conditions
+# Note:
+# - Tesla triggers do not update often due to infrequent polling.
+#   See https://github.com/alandtse/tesla/wiki/Polling-policy
+###############################################################################
+# Trigger variables must be defined here because triggers and conditions do not have access to global variables at time of trigger.
+# Trigger variables are global variables.
+trigger_variables:
+
+  i_bleVinId: !input ble_vin_id
+  bleVinId: "{{ i_bleVinId | lower }}"
+  
+  rc_charger_connected: "{{'sae'] }}"
+  rc_charger_charging: "{{ ['on'] }}"
+  rc_charger_connected_or_charging: "{{ rc_charger_connected + rc_charger_charging }}"
+
+triggers:
+  # Trigger automation if start EV solar charger is pressed
+  - trigger: state
+    entity_id: input_button.start_ev_solar_charger
+    
+conditions:
+  # Car must be at home.
+  - condition: state
+    entity_id: device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
+    state: "home"
+  # Car must be plugged at the charger at home.
+  - condition: state
+    entity_id: binary_sensor.tesla_wall_connector_vehicle_connected
+    state: "on"
+
+###############################################################################
+# Global constants and site specific variables
+# https://community.home-assistant.io/t/why-the-heck-dont-we-have-global-variables/219671/86
+# https://github.com/rogro82/hass-variables
+###############################################################################
+variables:
+
+  #####################################
+  # Constants
+  #####################################
+  # Tesla UMC charger initial minimum charging current is 5A, after that it can vary between 0A and 48A.
+  initial_charge_current: 5
+  
+  # Time to wait in seconds for car to wake up.
+  wait_car_wakeup: 40
+
+  # Time to wait in seconds to turn charger on or off.
+  # To switch on charger from 2V to 230V and then ram up current, it took 16 seconds for initial_charge_current 15A.
+  #wait_charger_on: 16
+  # To switch on charger from 2V to 230V and then ram up current, it took 11 seconds for initial_charge_current 6A.
+  wait_charger_on: 11
+  wait_charger_off: 5
+
+  # Time to wait in seconds for current to change after sending command.
+  #wait_current_change: "00:00:0.3"
+  wait_current_change: 1
+
+  # Wait in seconds after setting car charge limit.
+  wait_charge_limit: 5
+
+  # Time to wait in seconds for command to execute after sending command.
+  wait_fleet_api_update: 10
+  #wait_fleet_api_update_str: "00:00:{{ wait_fleet_api_update }}"
+
+  # Valid charge limit range for Tesla API, otherwise will get following error,
+  # Error: Value 0.0 for number.charge_limit is outside valid range 50 - 100
+  car_charge_limit_min: 50
+  car_charge_limit_max: 100
+
+  # Wait in seconds after issuing update status command to update HA. 
+  # Extra delay required for BLE MQTT to register change in charging state. Need minimum 8 seconds for Tesla BLE.
+
+  wait_force_update_all: 30
+  wait_force_update_charge: 10
+  
+  #####################################
+  # Inputs
+  #####################################
+
+  carChargerVoltage: !input charger_voltage
+  carChargerMaxCurrent: !input charger_max_current
+
+  # The skew shifts the power export/import curve left or right defining the range where power can fluctuate without causing charger current adjustment. 
+  # The higher the skew, the lesser the chance to import power and more likely to export power.
+  # Skew should be kept between 0 and 1 inclusive.
+  # It defines the 230W buffer range in which allPowerNet can fluctuate without causing charger current adjustment.
+  #
+  # Lower skewed power = P*skew*(-1) - P/2
+  # Upper skewed power = P*skew*(-1) + P/2
+  # where P = oneAmpWattStep = carChargerVoltage * 1A, eg. 230W
+  #
+  # To test current decrease by 1A with skew=+0.3, set e_mainPowerNet=47W
+  # To test current increase by 1A with skew=+0.3, set e_mainPowerNet=-185W
+  #
+  # Skew  Power fluctuation range     Comment
+  # ----------------------------------------------------------------
+  # +2    -575  < allPowerNet < -345  Fluctuates below 0W decreases power draw
+  # +1    -345  < allPowerNet < -115
+  # +0.7  -276  < allPowerNet < -46
+  # +0.5  -230  < allPowerNet < 0
+  # +0.3  -184  < allPowerNet < +46
+  # 0     -115  < allPowerNet < +115  Fluctuates symmetrically around 0W
+  # -1    +115  < allPowerNet < +345
+  # -2    +345  < allPowerNet < +575  Fluctuates above 0W increases power draw
+  powerDrawSkew: !input power_draw_skew
+  
+  # Power = Voltage * Current
+  # The power step in watts to increase or decrease with 1A current change.
+  oneAmpWattStep: "{{ carChargerVoltage * 1 }}"
+
+  #####################################
+  # e_ => External entities
+  # Must use states() to access external entities.
+  # Must not use states() to access local variables.
+  #####################################
+  # sensor_main_power_net expresses negative value in Watts for available power for charging car or positive value for consumed power.
+  e_mainPowerNet: !input sensor_main_power_net
+
+  e_carChargerMinCurrent: !input charger_min_current
+  e_powerOffsetFromZero: !input power_offset_from_zero
+  e_useSecondaryPowerSource: !input toggle_secondary_power_source
+  e_stopCharger: !input toggle_stop_charger
+  
+  #####################################
+  # Charge control API
+  #####################################
+  # https://community.home-assistant.io/t/how-to-use-if-then-statements-to-create-dictionary-variables-in-scripts/688152
+  # https://community.home-assistant.io/t/return-a-variable-which-is-a-dictionary-in-script-to-automation/796744/5
+  # Dictionaries can be defined here but not accessed here!
+  teslaBleMqttApi:
+    k_charger_plugged_in: "sensor.tesla_ble_{{ bleVinId }}_charge_cable"
+    k_charger_onoff_switch: "switch.tesla_ble_{{ bleVinId }}_charger"
+    k_charger_charging: "sensor.tesla_ble_{{ bleVinId }}_charging_state"
+    k_charger_current: "number.tesla_ble_{{ bleVinId }}_charging_current"
+    k_ev_battery_level: "sensor.tesla_ble_{{ bleVinId }}_battery_level"
+    k_ev_charge_limit: "number.tesla_ble_{{ bleVinId }}_charging_limit"
+    k_ev_home_tracker: "device_tracker.tesla_ble_{{ bleVinId }}_presence_bc"
+    k_ev_wake_up: "button.tesla_ble_{{ bleVinId }}_wake_up_car"
+    k_ev_awake_sensor: "binary_sensor.tesla_ble_{{ bleVinId }}_awake"
+    k_ev_status_update_charge: "button.tesla_ble_{{ bleVinId }}_force_update_charge"
+    k_ev_status_update_all: "button.tesla_ble_{{ bleVinId }}_force_update_all"
+
+###############################################################################
+# Actions
+###############################################################################
+actions:
+
+  #####################################
+  # Global action variables
+  #####################################
+  - variables:
+
+      chargeControlApiMap:
+        k_tesla_blemqtt_api: "{{ teslaBleMqttApi }}"
+
+      chargeControlApi: "{{ chargeControlApiMap[chargeControlApiSelected] }}"
+    
+      e_carChargerPluggedIn: "{{ chargeControlApi[k_charger_plugged_in] }}"
+      e_carChargerSwitch: "{{ chargeControlApi[k_charger_onoff_switch] }}"
+      e_isCarCharging: "{{ chargeControlApi[k_charger_charging] }}"
+      e_carChargingAmps: "{{ chargeControlApi[k_charger_current] }}"
+      e_evCarBatteryLevel: "{{ chargeControlApi[k_ev_battery_level] }}"
+      e_evCarChargeLimit: "{{ chargeControlApi[k_ev_charge_limit] }}"
+      e_publishCarChargeLimit: "{{ chargeControlApi[k_ev_charge_limit] }}"
+      e_evCarLocation: "{{ chargeControlApi[k_ev_home_tracker] }}"
+      e_evCarWakeUp: "{{ chargeControlApi[k_ev_wake_up] }}"
+      e_evCarAwakeSensor: "{{ chargeControlApi[k_ev_awake_sensor] }}"
+      e_evCarForceUpdateChargeHa: "{{ chargeControlApi[k_ev_status_update_charge] }}"
+      e_evCarForceUpdateAllHa: "{{ chargeControlApi[k_ev_status_update_all] }}"
+
+  #####################################
+  # Init car and charger
+  #####################################
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarWakeUp) }}"
+      - condition: state
+        entity_id:     "{{ e_evCarWakeUpSensor }}"
+        state: "off"
+    then:
+      - action: button.press
+        data: {}
+        target:
+          entity_id: "{{ e_evCarWakeUp }}"
+      - delay: "{{ wait_car_wakeup }}"
+
+  # Get the latest data from car to update HA.
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarForceUpdateAllHa) }}"
+    then:
+      - action: button.press
+        data: {}
+        target:
+          entity_id: "{{ e_evCarForceUpdateAllHa }}"
+      - delay: "{{ wait_force_update_all }}"
+
+  #####################################
+  # Set car charge limit on start up
+  #####################################
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarChargeLimit) and has_value(e_publishCarChargeLimit) }}"
+    then:
+      - action: input_number.set_value
+        data_template:
+          entity_id: "{{ e_publishCarChargeLimit }}"
+          value: "{{ states(e_evCarChargeLimit) | int }}"
+
+  #####################################
+  # Main while loop
+  #####################################
+  - repeat:
+
+      #####################################
+      # Only start charging when following conditions are met, otherwise exit script.
+      #####################################
+      while:
+        - condition: and
+          conditions:
+
+            - alias: "Continue if stop button is toggled off"
+              condition: template
+              value_template: >
+                {% if has_value(e_stopCharger) %}
+                  {{ is_state(e_stopCharger, 'off') }}
+                {% else %}
+                  {{ true }}
+                {% endif %}
+
+            - alias: "Continue if charger is plugged in or charging"
+              condition: template
+              value_template: "{{ states(e_carChargerPluggedIn) | lower in rc_charger_connected_or_charging }}"
+
+            # For Tesla BLE, if car got disconnected and driven away before the next update, all sensors stayed the same except binary_sensor.tesla_ble_vin_presence.
+            # binary_sensor.tesla_ble_vin_presence detected car was away after few minutes, and script tried to turn off charger before exiting, but still all sensors stayed the same.
+            # Unfortunately BLE Bluetooth beacon is unreliable, which means the charger and script can stop unintentionally if using binary_sensor.tesla_ble_vin_presence!
+            - alias: "Continue if using Tesla BLE and car is at home"
+              condition: template
+              value_template: >
+                {% if useBleMqttApi and has_value(e_evCarLocation) %}
+                  {{ states(e_evCarLocation) | lower in rc_ev_at_home }}
+                {% else %}
+                  {{ true }}
+                {% endif %}
+
+            - alias: "Continue if battery is below charge limit"
+              condition: template
+              value_template: >
+                {% if has_value(e_evCarBatteryLevel) and (has_value(e_evCarChargeLimit) or has_value(e_publishCarChargeLimit)) %}
+                    {% if has_value(e_evCarChargeLimit) %}
+                      {% set evChargeLimit = states(e_evCarChargeLimit) | int %}
+                    {% else %}
+                      {% set evChargeLimit = states(e_publishCarChargeLimit) | int %}
+                    {% endif %}
+                    {{ (states(e_evCarBatteryLevel) | int) < evChargeLimit }}
+                {% else %}
+                    {{ true }}
+                {% endif %}
+
+            - condition: or
+              conditions:
+
+                - alias: "Continue if using secondary power source"
+                  condition: template
+                  value_template: "{{ has_value(e_useSecondaryPowerSource) and is_state(e_useSecondaryPowerSource, 'on') }}"
+      sequence:
+
+        #####################################
+        # Switch on charger before calculating power usage. Accuracy depends on rate of main_power_net update.
+        #####################################
+        - if:
+            - alias: "If looping for the first time in while loop"
+              condition: template
+              value_template: "{{ repeat.index == 1 }}"
+          then:
+            - alias: "Then turn on charger if not already on"
+              if:
+                - condition: template
+                  value_template: "{{ not states(e_isCarCharging) | lower in rc_charger_charging }}"
+              then:
+                # Turn on charger for the first time. Rate of current increase is handled by Tesla car.
+                - action: switch.turn_on
+                  data: {}
+                  target:
+                    entity_id: "{{ e_carChargerSwitch }}"
+                - delay: "{{ wait_charger_on }}"
+
+            # Always set initial charge current here after turning on charger.
+            # Tesla API will only set new charge current if the old and new values are different. Confirmed in log.
+            # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
+            - alias: "And set initial charge current"
+              if:
+                - condition: template
+                  value_template: "{{ useOcppApi }}"
+              then:
+                - action: ocpp.set_charge_rate     
+                  data:
+                    custom_profile: |
+                      {
+                        "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+                        "chargingProfileId": 1,
+                        "stackLevel": {{ ocppStackLevel }},
+                        "chargingProfilePurpose": "TxProfile",
+                        "chargingProfileKind": "Relative",
+                        "chargingSchedule": {
+                          "chargingRateUnit": "A",
+                          "chargingSchedulePeriod": [
+                            {"startPeriod": 0, "limit": {{ initial_charge_current }}}  
+                          ]
+                        }
+                      }
+                    conn_id: 1
+              else:
+                - action: number.set_value
+                  data:
+                    value: "{{ initial_charge_current }}"
+                  target:
+                    entity_id: "{{ e_carChargingAmps }}"
+            - delay: "{{ wait_current_change }}"
+
+            # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
+            # Tesla BLE MQTT took 110 sec for force_update_all, but only 13 sec for force_update_charge.
+            #
+            - if:
+                - condition: template
+                  value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
+              then:
+                - action: button.press
+                  data: {}
+                  target:
+                    entity_id: "{{ e_evCarForceUpdateChargeHaHa }}"
+                - delay: "{{ wait_force_update_charge }}"
+
+            # BLE: Need minimum wait_charging_status_update=16, wait_force_update=5. Charging status took 27 sec to register after sending switch on charger command.
+            # Others: wait_charging_status_update=0, wait_force_update=5
+            - alias: "Wait charging status update" 
+              delay: !input wait_charging_status_update
+
+        #####################################
+        # Calculate new charging current
+        #####################################
+        - variables:
+            # Minimum charge current
+            chargerMinCurrent: >
+              {% if has_value(e_carChargerMinCurrent) %}
+                {{ states(e_carChargerMinCurrent) | int }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
+
+            # -ve to use from secondary power source, +ve to export to secondary power source.
+            powerOffset: >
+              {% if has_value(e_powerOffsetFromZero) %}
+                {{ states(e_powerOffsetFromZero) | int }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
+
+            # Feedback loop power sensor
+            feedbackLoopPower: "{{ states(e_mainPowerNet) | float(0) }}"
+
+            # Net power from all sources (default 0 set by float(0) if cannot convert to float).
+            allPowerNet: "{{ feedbackLoopPower + (oneAmpWattStep * powerDrawSkew) + powerOffset }}"
+
+            # This can be greater than carChargerMaxCurrent.
+            # +ve => importing amp from grid, -ve => exporting amp to grid
+            allCurrentNet: "{{ (allPowerNet / oneAmpWattStep) | float }}"
+
+            # Charge current for this sequence run, including sanity check to ensure within limits. OCPP has current with 1 decimal place.
+            chargeCurrent: "{{ states(e_carChargingAmps) | round(0) }}"
+            carChargeCurrent: >
+              {% if chargeCurrent < 0 %}
+                {{ 0 }}
+              {% elif chargeCurrent > carChargerMaxCurrent %}
+                {{ carChargerMaxCurrent }}
+              {% else %}
+                {{ chargeCurrent }}
+              {% endif %}
+
+            # If importing from grid, will try to decrease charge current by same consumption or min charger current.
+            # If exporting to grid, will try to increase charge current by same production or max charger current.
+            proposeChargeCurrent: >
+              {% if allCurrentNet > 0 %}
+                {{ [chargerMinCurrent, carChargeCurrent - allCurrentNet] | max | round(0) }}
+              {% else %}
+                {{ [carChargerMaxCurrent, carChargeCurrent - allCurrentNet] | min | round(0) }}
+              {% endif %}
+            
+            # Ensure new charge current is greater than or equal to charger minimum current.
+            newChargeCurrent: "{{ [chargerMinCurrent, proposeChargeCurrent] | max }}"
+
+            # Not used
+            #isDaytime: >
+            #  {% if (is_state_attr('sun.sun', 'rising', true) and state_attr('sun.sun', 'elevation') > sunriseElevationStartTrigger)
+            #  or (is_state_attr('sun.sun', 'rising', false) and state_attr('sun.sun', 'elevation') > sunsetElevationEndTrigger) %}
+            #    {{ true }}
+            #  {% else %}
+            #    {{ false }}
+            #  {% endif %}
+
+        #####################################
+        # Change charging current if required
+        #####################################
+        - choose:
+
+          - conditions:
+              - alias: "Exit script if car is not charging"
+                condition: template
+                value_template: "{{ not states(e_isCarCharging) | lower in rc_charger_charging }}"
+            sequence:
+              - alias: "Turn off charger just in case if charging status issue"
+                action: switch.turn_off
+                data: {}
+                target:
+                  entity_id: "{{ e_carChargerSwitch }}"
+              - delay: "{{ wait_charger_off }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+                then:
+                  - alias: "Get the latest data from Tesla to update HA before exiting script"
+                    action: button.press
+                    data: {}
+                    target:
+                      entity_id: "{{ e_evCarForceUpdateAllHa }}"
+                  - delay: "{{ wait_force_update_all }}"
+              - stop: >
+                  Exiting script due to charger turned off manually or automatically by car when charge limit reached.
+                  If this is unexpected, try increasing wait time for "Wait charging status update".
+                # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
+                # Cannot get response_variable to work. Needs to be key/value pair?
+                #response_variable: "stop_charging_reason"
+
+          - conditions:
+              - alias: "Set charge current if new current is different from old"
+                condition: template
+                value_template: "{{ newChargeCurrent != carChargeCurrent }}"
+            sequence:
+                - action: number.set_value
+                  data_template:
+                    value: "{{ newChargeCurrent }}"
+                  target:
+                    entity_id: "{{ e_carChargingAmps }}"
+            - delay: "{{ wait_current_change }}"
+
+          default:
+            - alias: "Do nothing since new current is same as old"
+              delay: "00:00:00"
+
+        # Sleep enough to allow solar inverter updates. Should be ok to sleep longer to avoid changing charge current too often.
+        # Other things can happen during sleep time, eg. car unplugged.
+        - delay:
+            hours: 0
+            minutes: 0
+            seconds: !input wait_main_power_net_update
+            milliseconds: 0
+
+        # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
+        - if:
+            - condition: template
+              value_template: "{{ has_value(e_evCarForceUpdateChargeHaHa) }}"
+          then:
+            - action: button.press
+              data: {}
+              target:
+                entity_id: "{{ e_evCarForceUpdateChargeHaHa }}"
+            - delay: "{{ wait_force_update_charge }}"
+
+  #####################################
+  # Exit script
+  #####################################
+  # Set 0 charging current and turn off charger if it is on or charging
+  - if:
+      - condition: template
+        value_template: "{{ states(e_isCarCharging) | lower in rc_charger_charging_or_completed }}"
+    then:
+      # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
+      # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
+      - action: number.set_value
+        data_template:
+          value: "{{ 0 }}"
+        target:
+          entity_id: "{{ e_carChargingAmps }}"
+      - delay: "{{ wait_current_change }}"
+
+      # For BLE, charger is still turned on after reaching charge limit, ie. charging status=complete, so need to turn off charger here.
+      - alias: "Turn off charger on exit"
+        action: switch.turn_off
+        data: {}
+        target:
+          entity_id: "{{ e_carChargerSwitch }}"
+      - delay: "{{ wait_charger_off }}"
+
+  # For Tesla custom API, do not send command to turn off charger here if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
+  # Get the latest data from Tesla to update HA before exiting script.
+  - if:
+      - condition: template
+        value_template: "{{ has_value(e_evCarForceUpdateAllHa) }}"
+    then:
+      - action: button.press
+        data: {}
+        target:
+          entity_id: "{{ e_evCarForceUpdateAllHa }}"
+      - delay: "{{ wait_force_update_all }}"
+
+###############################################################################
+# Only one Blueprint can run at any one time
+###############################################################################
+mode: single
