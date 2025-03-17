@@ -225,7 +225,7 @@ conditions:
       {% else %}
         {{ true }}
       {% endif %}
-    state: "home"
+      
   # Car must be plugged at the charger at home.
   - condition: state
     entity_id: binary_sensor.tesla_wall_connector_vehicle_connected
