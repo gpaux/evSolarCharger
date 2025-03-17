@@ -377,8 +377,8 @@ actions:
   - if:
       - condition: template
         value_template: "{{ has_value(e_evCarWakeUp) }}"
-      - condition: state
-        entity_id: "{{ is_state(e_evCarAwakeSensor,  'off') }}"
+      - condition: template
+        value_template: "{{ is_state(e_evCarAwakeSensor,  'off') }}"
     then:
       - action: button.press
         data: {}
