@@ -605,11 +605,11 @@ actions:
                 condition: template
                 value_template: "{{ newChargeCurrent != carChargeCurrent }}"
             sequence:
-                - action: number.set_value
-                  data_template:
-                    value: "{{ newChargeCurrent }}"
-                  target:
-                    entity_id: "{{ e_carChargingAmps }}"
+              - action: number.set_value
+                data_template:
+                  value: "{{ newChargeCurrent }}"
+                target:
+                  entity_id: "{{ e_carChargingAmps }}"
               - delay: "{{ wait_current_change }}"
 
           default:
