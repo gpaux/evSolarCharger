@@ -451,12 +451,10 @@ actions:
                     {{ true }}
                 {% endif %}
 
-            - condition: or
-              conditions:
+            - alias: "Continue if using secondary power source"
+              condition: template
+              value_template: "{{ has_value(e_useSecondaryPowerSource) and is_state(e_useSecondaryPowerSource, 'on') }}"
 
-                - alias: "Continue if using secondary power source"
-                  condition: template
-                  value_template: "{{ has_value(e_useSecondaryPowerSource) and is_state(e_useSecondaryPowerSource, 'on') }}"
       sequence:
 
         #####################################
@@ -483,38 +481,15 @@ actions:
             # Tesla API will only set new charge current if the old and new values are different. Confirmed in log.
             # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
             - alias: "And set initial charge current"
-              if:
-                - condition: template
-                  value_template: "{{ useOcppApi }}"
-              then:
-                - action: ocpp.set_charge_rate     
-                  data:
-                    custom_profile: |
-                      {
-                        "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
-                        "chargingProfileId": 1,
-                        "stackLevel": {{ ocppStackLevel }},
-                        "chargingProfilePurpose": "TxProfile",
-                        "chargingProfileKind": "Relative",
-                        "chargingSchedule": {
-                          "chargingRateUnit": "A",
-                          "chargingSchedulePeriod": [
-                            {"startPeriod": 0, "limit": {{ initial_charge_current }}}  
-                          ]
-                        }
-                      }
-                    conn_id: 1
-              else:
-                - action: number.set_value
-                  data:
-                    value: "{{ initial_charge_current }}"
-                  target:
-                    entity_id: "{{ e_carChargingAmps }}"
+              action: number.set_value
+              data:
+                value: "{{ initial_charge_current }}"
+              target:
+                entity_id: "{{ e_carChargingAmps }}"
             - delay: "{{ wait_current_change }}"
 
             # Sometimes the charging status is not updated after turning on charger causing script to exit in while loop. Best to get status now.
             # Tesla BLE MQTT took 110 sec for force_update_all, but only 13 sec for force_update_charge.
-            #
             - if:
                 - condition: template
                   value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
@@ -522,7 +497,7 @@ actions:
                 - action: button.press
                   data: {}
                   target:
-                    entity_id: "{{ e_evCarForceUpdateChargeHaHa }}"
+                    entity_id: "{{ e_evCarForceUpdateChargeHa }}"
                 - delay: "{{ wait_force_update_charge }}"
 
             # BLE: Need minimum wait_charging_status_update=16, wait_force_update=5. Charging status took 27 sec to register after sending switch on charger command.
@@ -610,7 +585,7 @@ actions:
               - delay: "{{ wait_charger_off }}"
               - if:
                   - condition: template
-                    value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+                    value_template: "{{ has_value(e_evCarForceUpdateAllHa) }}"
                 then:
                   - alias: "Get the latest data from Tesla to update HA before exiting script"
                     action: button.press
@@ -635,7 +610,7 @@ actions:
                     value: "{{ newChargeCurrent }}"
                   target:
                     entity_id: "{{ e_carChargingAmps }}"
-            - delay: "{{ wait_current_change }}"
+              - delay: "{{ wait_current_change }}"
 
           default:
             - alias: "Do nothing since new current is same as old"
@@ -652,12 +627,12 @@ actions:
         # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
         - if:
             - condition: template
-              value_template: "{{ has_value(e_evCarForceUpdateChargeHaHa) }}"
+              value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
           then:
             - action: button.press
               data: {}
               target:
-                entity_id: "{{ e_evCarForceUpdateChargeHaHa }}"
+                entity_id: "{{ e_evCarForceUpdateChargeHa }}"
             - delay: "{{ wait_force_update_charge }}"
 
   #####################################
