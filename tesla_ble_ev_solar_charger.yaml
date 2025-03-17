@@ -205,8 +205,6 @@ trigger_variables:
   rc_charger_connected: "{{ ['sae'] }}"
   rc_charger_charging: "{{ ['on'] }}"
   rc_charger_connected_or_charging: "{{ rc_charger_connected + rc_charger_charging }}"
-  
-  e_evCarLocation: {{ device_tracker.tesla_ble_{{ bleVinId }}_presence_bc }}
 
   e_evCarLocation: >
       device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
