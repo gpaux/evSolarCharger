@@ -585,14 +585,14 @@ actions:
               - delay: "{{ wait_charger_off }}"
               - if:
                   - condition: template
-                    value_template: "{{ has_value(e_evCarForceUpdateAllHa) }}"
+                    value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
                 then:
                   - alias: "Get the latest data from Tesla to update HA before exiting script"
                     action: button.press
                     data: {}
                     target:
-                      entity_id: "{{ e_evCarForceUpdateAllHa }}"
-                  - delay: "{{ wait_force_update_all }}"
+                      entity_id: "{{ e_evCarForceUpdateHa }}"
+                  - delay: "{{ wait_force_update }}"
               - stop: >
                   Exiting script due to charger turned off manually or automatically by car when charge limit reached.
                   If this is unexpected, try increasing wait time for "Wait charging status update".
@@ -605,11 +605,33 @@ actions:
                 condition: template
                 value_template: "{{ newChargeCurrent != carChargeCurrent }}"
             sequence:
-              - action: number.set_value
-                data_template:
-                  value: "{{ newChargeCurrent }}"
-                target:
-                  entity_id: "{{ e_carChargingAmps }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ useOcppApi }}"
+                then:
+                  - action: ocpp.set_charge_rate
+                    data:
+                      custom_profile: |
+                        {
+                          "transactionId": {{ states(e_ocppChargerTransactionId) | int }},
+                          "chargingProfileId": 1,
+                          "stackLevel": {{ ocppStackLevel }},
+                          "chargingProfilePurpose": "TxProfile",
+                          "chargingProfileKind": "Relative",
+                          "chargingSchedule": {
+                            "chargingRateUnit": "A",
+                            "chargingSchedulePeriod": [
+                              {"startPeriod": 0, "limit": {{ newChargeCurrent }}}  
+                            ]
+                          }
+                        }
+                      conn_id: 1
+                else:
+                  - action: number.set_value
+                    data_template:
+                      value: "{{ newChargeCurrent }}"
+                    target:
+                      entity_id: "{{ e_carChargingAmps }}"
               - delay: "{{ wait_current_change }}"
 
           default:
@@ -627,13 +649,13 @@ actions:
         # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
         - if:
             - condition: template
-              value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
+              value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
           then:
             - action: button.press
               data: {}
               target:
-                entity_id: "{{ e_evCarForceUpdateChargeHa }}"
-            - delay: "{{ wait_force_update_charge }}"
+                entity_id: "{{ e_evCarForceUpdateHa }}"
+            - delay: "{{ wait_force_update }}"
 
   #####################################
   # Exit script
