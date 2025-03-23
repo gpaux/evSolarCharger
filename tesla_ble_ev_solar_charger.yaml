@@ -188,7 +188,8 @@ trigger_variables:
 triggers:
   # Trigger automation if start EV solar charger is pressed
   - trigger: state
-    entity_id: "{{ i_startCharger }}"
+    target:
+      entity_id: "{{ i_startCharger }}"
     
 conditions:
   # Car must be at home.
