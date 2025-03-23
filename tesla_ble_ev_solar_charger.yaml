@@ -125,9 +125,19 @@ blueprint:
             - input_number
             - number
             - sensor
+
+    button_start_charger:
+      name: Start EV Solar Charger
+      description: >
+        Toggle on to start EV Solar charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
+          * The default is off if not defined.
+      default: input_button.start_ev_solar_charger
+      selector:
+        entity:
+          domain: input_button
           
     toggle_stop_charger:
-      name: Stop charger toggle
+      name: Stop EV Solar Charger
       description: >
         Toggle on to stop charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
         Delayed by "Wait main power net update" value.
@@ -173,10 +183,12 @@ trigger_variables:
     
   rc_ev_at_home: "{{ ['home', 'unknown'] }}"
 
+  i_startCharger: !input button_start_charger
+
 triggers:
   # Trigger automation if start EV solar charger is pressed
   - trigger: state
-    entity_id: input_button.start_ev_solar_charger
+    entity_id: "{{ i_startCharger }}"
     
 conditions:
   # Car must be at home.
