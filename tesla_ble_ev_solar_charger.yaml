@@ -552,6 +552,14 @@ actions:
                 target:
                   entity_id: "{{ e_carChargerSwitch }}"
               - delay: "{{ wait_charger_off }}"
+     
+              # Turn off the EV Charger toggle.
+              - alias: "Turn off EV Solar Charger toggle"
+                action: input_boolean.turn_off
+                data: {}
+                target:
+                  entity_id: "{{ e_startCharger }}"
+              
               - action: number.set_value
                 data_template:
                   value: "{{ 0 }}"
@@ -640,6 +648,13 @@ actions:
         target:
           entity_id: "{{ e_carChargerSwitch }}"
       - delay: "{{ wait_charger_off }}"
+
+      # Turn off the EV Charger toggle.
+      - alias: "Turn off EV Solar Charger toggle"
+        action: input_boolean.turn_off
+        data: {}
+        target:
+          entity_id: "{{ e_startCharger }}"
 
   # For Tesla custom API, do not send command to turn off charger here if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
   # Get the latest data from Tesla to update HA before exiting script.
