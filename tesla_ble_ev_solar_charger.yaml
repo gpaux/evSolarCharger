@@ -209,7 +209,7 @@ trigger_variables:
   e_evCarLocation: >
       device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
     
-  rc_ev_at_home: "{{ ['home'] }}"
+  rc_ev_at_home: "{{ ['home', 'unknown'] }}"
 
 triggers:
   # Trigger automation if start EV solar charger is pressed
