@@ -356,7 +356,7 @@ actions:
       chargeControlApiMap:
         k_tesla_blemqtt_api: "{{ teslaBleMqttApi }}"
 
-      chargeControlApi: "{{ chargeControlApiMap[chargeControlApiSelected] }}"
+      chargeControlApi: "{{ chargeControlApiMap[k_tesla_blemqtt_api] }}"
     
       e_carChargerPluggedIn: "{{ chargeControlApi[k_charger_plugged_in] }}"
       e_carChargerSwitch: "{{ chargeControlApi[k_charger_onoff_switch] }}"
