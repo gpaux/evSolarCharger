@@ -183,13 +183,12 @@ trigger_variables:
     
   rc_ev_at_home: "{{ ['home', 'unknown'] }}"
 
-  i_startCharger: !input button_start_charger
+  e_startCharger: !input button_start_charger
 
 triggers:
   # Trigger automation if start EV solar charger is pressed
-  - trigger: state
-    target:
-      entity_id: "{{ i_startCharger }}"
+  - trigger: template
+    value_template: "{{ states(e_startCharger) | lower in 'press' }}"
     
 conditions:
   # Car must be at home.
