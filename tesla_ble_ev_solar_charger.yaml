@@ -178,12 +178,7 @@ trigger_variables:
 triggers:
   # Trigger automation if start EV solar charger is pressed
   - trigger: template
-    value_template: >
-      {% if has_value(e_startCharger) %}
-        {{ states(e_startCharger) | lower in 'on' }}
-      {% else %}
-        {{ true }}
-      {% endif %}
+    value_template: "{{ is_state_attr(e_startCharger, 'off', 'on') }}"
 
 conditions:
   # Car must be at home.
