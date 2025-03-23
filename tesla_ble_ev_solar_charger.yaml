@@ -558,12 +558,25 @@ actions:
                 target:
                   entity_id: "{{ e_carChargerSwitch }}"
               - delay: "{{ wait_charger_off }}"
+
+              # Turn off EV Solar Charger toggle
+              - alias: "Turn off EV Solar Charger toggle"
+                if:
+                  - condition: template
+                    value_template: "{{ is_state(e_startCharger, 'on') }}"
+                then:
+                 - action: input_boolean.turn_off
+                   data: {}
+                   target:
+                     entity_id: "{{ e_startCharger }}"
+         
               - action: number.set_value
                 data_template:
                   value: "{{ 0 }}"
                 target:
                   entity_id: "{{ e_carChargingAmps }}"
               - delay: "{{ wait_current_change }}"
+             
               - if:
                   - condition: template
                     value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
@@ -574,12 +587,14 @@ actions:
                     target:
                       entity_id: "{{ e_evCarForceUpdateChargeHa }}"
                   - delay: "{{ wait_force_update_charge }}"
+              
               - alias: "Notify all devices EV Solar Charger has finished"
                 action: notify.all_devices
                 metadata: {}
                 data:
                   message: Finished
                   title: EV Solar Charger  
+              
               - stop: >
                   Exiting script due to charger turned off manually or automatically by car when charge limit reached.
                   If this is unexpected, try increasing wait time for "Wait charging status update".
@@ -646,7 +661,18 @@ actions:
         target:
           entity_id: "{{ e_carChargerSwitch }}"
       - delay: "{{ wait_charger_off }}"
-
+      
+  # Turn off EV Solar Charger toggle
+  - alias: "Turn off EV Solar Charger toggle"
+    if:
+      - condition: template
+        value_template: "{{ is_state(e_startCharger, 'on') }}"
+    then:
+     - action: input_boolean.turn_off
+       data: {}
+       target:
+         entity_id: "{{ e_startCharger }}"
+       
   # For Tesla custom API, do not send command to turn off charger here if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
   # Get the latest data from Tesla to update HA before exiting script.
   - if:
