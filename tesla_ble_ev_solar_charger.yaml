@@ -475,6 +475,13 @@ actions:
             - alias: "Wait charging status update" 
               delay: {{ wait_charging_status_update }}"
 
+            - alias: "Notify devices EV Solar Charger has started" 
+              action: notify.all_devices
+              metadata: {}
+              data:
+                message: Started
+                title: EV Solar Charger
+                
         #####################################
         # Calculate new charging current
         #####################################
@@ -560,6 +567,12 @@ actions:
                     target:
                       entity_id: "{{ e_evCarForceUpdateChargeHa }}"
                   - delay: "{{ wait_force_update_charge }}"
+              - alias: "Notify all devices EV Solar Charger has finished"
+                action: notify.all_devices
+                metadata: {}
+                data:
+                  message: Finished
+                  title: EV Solar Charger  
               - stop: >
                   Exiting script due to charger turned off manually or automatically by car when charge limit reached.
                   If this is unexpected, try increasing wait time for "Wait charging status update".
@@ -638,6 +651,13 @@ actions:
         target:
           entity_id: "{{ e_evCarForceUpdateAllHa }}"
       - delay: "{{ wait_force_update_all }}"
+
+  - alias: "Notify all devices EV Solar Charger has finished"
+    action: notify.all_devices
+    metadata: {}
+    data:
+      message: Finished
+      title: EV Solar Charger
 
 ###############################################################################
 # Only one Blueprint can run at any one time
