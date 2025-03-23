@@ -92,33 +92,6 @@ blueprint:
           unit_of_measurement: second
           mode: box
 
-    wait_status_update:
-      name: Wait status update
-      description: >
-        Specify in seconds to wait for status update after issuing command to refresh status in HA.
-          * Default:  10
-      default: 19
-      selector:
-        number:
-          min: 1
-          max: 600
-          unit_of_measurement: second
-          mode: box
-
-    wait_charging_status_update:
-      name: Wait charging status update
-      description: >
-        Specify in seconds to wait for charging status update in HA after switching on charger.
-        Tested ok with minimum 16 seconds for Tesla BLE MQTT API, but suggest to try 20 seconds.
-          * Default:  0
-      default: 20
-      selector:
-        number:
-          min: 0
-          max: 600
-          unit_of_measurement: second
-          mode: box
-
     power_draw_skew:
       name: Power draw skew
       description: >
@@ -152,17 +125,6 @@ blueprint:
             - input_number
             - number
             - sensor
-
-    toggle_secondary_power_source:
-      name: Secondary power source toggle for night time charging
-      description: >
-        Toggle on to charge from secondary power source (eg. grid/battery) at night using power offset or minimum current (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        Toggle off to charge car during daytime only.
-          * The default is off if not defined.
-      default: boolean.user_custom
-      selector:
-        entity:
-          domain: input_boolean
           
     toggle_stop_charger:
       name: Stop charger toggle
@@ -274,7 +236,8 @@ variables:
   # Extra delay required for BLE MQTT to register change in charging state. Need minimum 8 seconds for Tesla BLE.
 
   wait_force_update_all: 30
-  wait_force_update_charge: 20
+  wait_force_update_charge: 15
+  wait_charging_status_update: 20
   
   #####################################
   # Inputs
@@ -321,7 +284,6 @@ variables:
 
   e_carChargerMinCurrent: !input charger_min_current
   e_powerOffsetFromZero: !input power_offset_from_zero
-  e_useSecondaryPowerSource: !input toggle_secondary_power_source
   e_stopCharger: !input toggle_stop_charger
   
   #####################################
@@ -511,7 +473,7 @@ actions:
             # BLE: Need minimum wait_charging_status_update=16, wait_force_update=5. Charging status took 27 sec to register after sending switch on charger command.
             # Others: wait_charging_status_update=0, wait_force_update=5
             - alias: "Wait charging status update" 
-              delay: !input wait_charging_status_update
+              delay: {{ wait_charging_status_update }}"
 
         #####################################
         # Calculate new charging current
@@ -582,6 +544,12 @@ actions:
                 target:
                   entity_id: "{{ e_carChargerSwitch }}"
               - delay: "{{ wait_charger_off }}"
+              - action: number.set_value
+                data_template:
+                  value: "{{ 0 }}"
+                target:
+                  entity_id: "{{ e_carChargingAmps }}"
+              - delay: "{{ wait_current_change }}"
               - if:
                   - condition: template
                     value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
