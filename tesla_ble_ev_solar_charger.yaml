@@ -462,7 +462,8 @@ actions:
                 {% else %}
                     {{ true }}
                 {% endif %}
-
+                
+        - condition:
             - alias: "Continue if using secondary power source"
               condition: template
               value_template: "{{ has_value(e_useSecondaryPowerSource) and is_state(e_useSecondaryPowerSource, 'on') }}"
