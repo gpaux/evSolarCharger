@@ -546,9 +546,9 @@ actions:
               - alias: "Exit script if car is not charging"
                 condition: template
                 value_template: "{{ not states(e_isCarCharging) | lower in rc_charger_charging }}"
-               - alias: "Exit script if EV Solar Charger is toggled off"
-                 condition: template
-                 value_template: "{{ is_state(e_startCharger, 'off') }}"
+              - alias: "Exit script if EV Solar Charger is toggled off"
+                condition: template
+                value_template: "{{ is_state(e_startCharger, 'off') }}"
             sequence:
               - alias: "Turn off charger just in case if charging status issue"
                 action: switch.turn_off
