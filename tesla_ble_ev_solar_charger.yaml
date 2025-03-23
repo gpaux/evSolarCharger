@@ -626,15 +626,8 @@ actions:
   #####################################
   # Set 0 charging current and turn off charger if it is on or charging
   - if:
-      - conditions: 
-          condition: or
-          conditions:
-           - alias: "Exit script if car is not charging"
-             condition: template
-             value_template: "{{ states(e_isCarCharging) | lower in rc_charger_charging_or_completed }}"
-           - alias: "Exit script if EV Solar Charger is toggled off"
-             condition: template
-             value_template: "{{ is_state(e_startCharger, 'off') }}"    
+      - condition: template
+        value_template: "{{ states(e_isCarCharging) | lower in rc_charger_charging_or_completed }}" 
     then:
       # No need for step current change for Tesla car since car does step current change. Not sure about other EVs or chargers.
       # Tesla car can decrease current from 15A -> 7A -> 0A in 1 second.
