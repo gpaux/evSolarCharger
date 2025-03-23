@@ -262,7 +262,7 @@ variables:
   wait_charge_limit: 5
 
   # Time to wait in seconds for command to execute after sending command.
-  wait_fleet_api_update: 10
+  wait_fleet_api_update: 15
   #wait_fleet_api_update_str: "00:00:{{ wait_fleet_api_update }}"
 
   # Valid charge limit range for Tesla API, otherwise will get following error,
@@ -274,7 +274,7 @@ variables:
   # Extra delay required for BLE MQTT to register change in charging state. Need minimum 8 seconds for Tesla BLE.
 
   wait_force_update_all: 30
-  wait_force_update_charge: 10
+  wait_force_update_charge: 20
   
   #####################################
   # Inputs
