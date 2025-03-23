@@ -352,24 +352,18 @@ actions:
   # Global action variables
   #####################################
   - variables:
-
-      chargeControlApiMap:
-        k_tesla_blemqtt_api: "{{ teslaBleMqttApi }}"
-
-      chargeControlApi: "{{ chargeControlApiMap[k_tesla_blemqtt_api] }}"
-    
-      e_carChargerPluggedIn: "{{ chargeControlApi[k_charger_plugged_in] }}"
-      e_carChargerSwitch: "{{ chargeControlApi[k_charger_onoff_switch] }}"
-      e_isCarCharging: "{{ chargeControlApi[k_charger_charging] }}"
-      e_carChargingAmps: "{{ chargeControlApi[k_charger_current] }}"
-      e_evCarBatteryLevel: "{{ chargeControlApi[k_ev_battery_level] }}"
-      e_evCarChargeLimit: "{{ chargeControlApi[k_ev_charge_limit] }}"
-      e_publishCarChargeLimit: "{{ chargeControlApi[k_ev_charge_limit] }}"
-      e_evCarLocation: "{{ chargeControlApi[k_ev_home_tracker] }}"
-      e_evCarWakeUp: "{{ chargeControlApi[k_ev_wake_up] }}"
-      e_evCarAwakeSensor: "{{ chargeControlApi[k_ev_awake_sensor] }}"
-      e_evCarForceUpdateChargeHa: "{{ chargeControlApi[k_ev_status_update_charge] }}"
-      e_evCarForceUpdateAllHa: "{{ chargeControlApi[k_ev_status_update_all] }}"
+      e_carChargerPluggedIn: "{{ teslaBleMqttApi[k_charger_plugged_in] }}"
+      e_carChargerSwitch: "{{ teslaBleMqttApi[k_charger_onoff_switch] }}"
+      e_isCarCharging: "{{ teslaBleMqttApi[k_charger_charging] }}"
+      e_carChargingAmps: "{{ teslaBleMqttApi[k_charger_current] }}"
+      e_evCarBatteryLevel: "{{ teslaBleMqttApi[k_ev_battery_level] }}"
+      e_evCarChargeLimit: "{{ teslaBleMqttApi[k_ev_charge_limit] }}"
+      e_publishCarChargeLimit: "{{ teslaBleMqttApi[k_ev_charge_limit] }}"
+      e_evCarLocation: "{{ teslaBleMqttApi[k_ev_home_tracker] }}"
+      e_evCarWakeUp: "{{ teslaBleMqttApi[k_ev_wake_up] }}"
+      e_evCarAwakeSensor: "{{ teslaBleMqttApi[k_ev_awake_sensor] }}"
+      e_evCarForceUpdateChargeHa: "{{ teslaBleMqttApi[k_ev_status_update_charge] }}"
+      e_evCarForceUpdateAllHa: "{{ teslaBleMqttApi[k_ev_status_update_all] }}"
 
   #####################################
   # Init car and charger
