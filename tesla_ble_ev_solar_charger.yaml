@@ -330,6 +330,19 @@ variables:
   # https://community.home-assistant.io/t/how-to-use-if-then-statements-to-create-dictionary-variables-in-scripts/688152
   # https://community.home-assistant.io/t/return-a-variable-which-is-a-dictionary-in-script-to-automation/796744/5
   # Dictionaries can be defined here but not accessed here!
+  
+  k_charger_plugged_in: "k_charger_plugged_in"
+  k_charger_onoff_switch: "k_charger_onoff_switch"
+  k_charger_charging: "k_charger_charging"
+  k_charger_current: "k_charger_current"
+  k_ev_battery_level: "k_ev_battery_level"
+  k_ev_charge_limit: "k_ev_charge_limit"
+  k_ev_home_tracker: "k_ev_home_tracker"
+  k_ev_wake_up: "k_ev_wake_up"
+  k_ev_awake_sensor: "k_ev_awake_sensor"
+  k_ev_status_update_charge: "k_ev_status_update_charge"
+  k_ev_status_update_all: "k_ev_status_update_all"
+  
   teslaBleMqttApi:
     k_charger_plugged_in: "sensor.tesla_ble_{{ bleVinId }}_charge_cable"
     k_charger_onoff_switch: "switch.tesla_ble_{{ bleVinId }}_charger"
