@@ -626,13 +626,13 @@ actions:
         # Get latest conditions from Tesla to update HA as last step before checking these conditions at beginning of repeat loop.
         - if:
             - condition: template
-              value_template: "{{ has_value(e_evCarForceUpdateHa) }}"
+              value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
           then:
             - action: button.press
               data: {}
               target:
-                entity_id: "{{ e_evCarForceUpdateHa }}"
-            - delay: "{{ wait_force_update }}"
+                entity_id: "{{ e_evCarForceUpdateChargeHa }}"
+            - delay: "{{ wait_force_update_charge }}"
 
   #####################################
   # Exit script
