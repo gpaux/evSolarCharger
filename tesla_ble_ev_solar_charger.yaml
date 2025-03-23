@@ -473,7 +473,7 @@ actions:
             # BLE: Need minimum wait_charging_status_update=16, wait_force_update=5. Charging status took 27 sec to register after sending switch on charger command.
             # Others: wait_charging_status_update=0, wait_force_update=5
             - alias: "Wait charging status update" 
-              delay: {{ wait_charging_status_update }}"
+              delay: "{{ wait_charging_status_update }}"
 
             - alias: "Notify devices EV Solar Charger has started" 
               action: notify.all_devices
