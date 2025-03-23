@@ -549,49 +549,49 @@ actions:
                   - alias: "Exit script if EV Solar Charger is toggled off"
                     condition: template
                     value_template: "{{ is_state(e_startCharger, 'off') }}"
-                sequence:
-                  - alias: "Turn off charger just in case if charging status issue"
-                    action: switch.turn_off
-                    data: {}
-                    target:
-                      entity_id: "{{ e_carChargerSwitch }}"
-                  - delay: "{{ wait_charger_off }}"
+            sequence:
+              - alias: "Turn off charger just in case if charging status issue"
+                action: switch.turn_off
+                data: {}
+                target:
+                  entity_id: "{{ e_carChargerSwitch }}"
+              - delay: "{{ wait_charger_off }}"
          
-                  # Turn off the EV Charger toggle.
-                  - alias: "Turn off EV Solar Charger toggle"
-                    action: input_boolean.turn_off
+              # Turn off the EV Charger toggle.
+              - alias: "Turn off EV Solar Charger toggle"
+                action: input_boolean.turn_off
+                data: {}
+                target:
+                  entity_id: "{{ e_startCharger }}"
+                  
+              - action: number.set_value
+                data_template:
+                  value: "{{ 0 }}"
+                target:
+                  entity_id: "{{ e_carChargingAmps }}"
+              - delay: "{{ wait_current_change }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
+                then:
+                  - alias: "Get the latest data from Tesla to update HA before exiting script"
+                    action: button.press
                     data: {}
                     target:
-                      entity_id: "{{ e_startCharger }}"
-                  
-                  - action: number.set_value
-                    data_template:
-                      value: "{{ 0 }}"
-                    target:
-                      entity_id: "{{ e_carChargingAmps }}"
-                  - delay: "{{ wait_current_change }}"
-                  - if:
-                      - condition: template
-                        value_template: "{{ has_value(e_evCarForceUpdateChargeHa) }}"
-                    then:
-                      - alias: "Get the latest data from Tesla to update HA before exiting script"
-                        action: button.press
-                        data: {}
-                        target:
-                          entity_id: "{{ e_evCarForceUpdateChargeHa }}"
-                      - delay: "{{ wait_force_update_charge }}"
-                  - alias: "Notify all devices EV Solar Charger has finished"
-                    action: notify.all_devices
-                    metadata: {}
-                    data:
-                      message: Finished
-                      title: EV Solar Charger  
-                  - stop: >
-                      Exiting script due to charger turned off manually or automatically by car when charge limit reached.
-                      If this is unexpected, try increasing wait time for "Wait charging status update".
-                    # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
-                    # Cannot get response_variable to work. Needs to be key/value pair?
-                    #response_variable: "stop_charging_reason"
+                      entity_id: "{{ e_evCarForceUpdateChargeHa }}"
+                  - delay: "{{ wait_force_update_charge }}"
+              - alias: "Notify all devices EV Solar Charger has finished"
+                action: notify.all_devices
+                metadata: {}
+                data:
+                  message: Finished
+                  title: EV Solar Charger  
+              - stop: >
+                  Exiting script due to charger turned off manually or automatically by car when charge limit reached.
+                  If this is unexpected, try increasing wait time for "Wait charging status update".
+                  # https://www.home-assistant.io/docs/scripts/#stopping-a-script-sequence
+                  # Cannot get response_variable to work. Needs to be key/value pair?
+                  #response_variable: "stop_charging_reason"
 
           - conditions:
               - alias: "Set charge current if new current is different from old"
