@@ -16,12 +16,12 @@ blueprint:
 
   name: Tesla BLE EV solar charger automation
   description: >
-    Use Tesla BLE to charge EV from excess solar and weather forecast (v0.0.1).
+    Use Tesla BLE to charge EV from excess solar (v0.0.1).
 
     The following configs are required as a minimum for a functional Blueprint:
       * Main power net
       * Charger voltage and maximum current
-      * Car or charger unique identifier
+      * Car unique identifier (vin)
   domain: automation
 
   #####################################
@@ -130,7 +130,6 @@ blueprint:
       name: Start/Stop EV Solar Charger
       description: >
         Toggle on to start (on) or stop (off) charger script (Settings > Devices & Services > Helpers > Create helper > Toggle).
-        Delayed by "Wait main power net update" value.
           * The default is off if not defined.
       default: boolean.user_custom
       selector:
@@ -143,9 +142,8 @@ blueprint:
     ble_vin_id:
       name: Tesla BLE (Bluetooth Low Energy) VIN ID
       description: >
-        Enter the Tesla BLE VIN ID for use with ***Tesla BLE MQTT API***.
+        Enter the Tesla BLE VIN ID.
         BLE VIN ID combines with base entity name to form a unique entity identifier.
-        No need to define individual entities for this API unless they are marked as ***Not defined***.
           * Default:  vin
       default: "vin"
       selector:
@@ -170,15 +168,16 @@ trigger_variables:
 
   e_evCarLocation: >
       device_tracker.tesla_ble_{{ bleVinId }}_presence_bc
-    
+
+  # To prevent issues with BLE presence tracker, unknown location is added in the list
   rc_ev_at_home: "{{ ['home', 'unknown'] }}"
 
-  e_startCharger: !input toggle_start_charger
+  e_EVSolarCharger: !input toggle_start_charger
 
 triggers:
-  # Trigger automation if start EV solar charger is pressed
+  # Trigger automation if start EV solar charger is on
   - trigger: template
-    value_template: "{% if is_state(e_startCharger, 'on') %}true{% endif %}"
+    value_template: "{% if is_state(e_EVSolarCharger, 'on') %}true{% endif %}"
 
 conditions:
   # Car must be at home.
@@ -391,11 +390,11 @@ actions:
         - condition: and
           conditions:
 
-            - alias: "Continue if start button is toggled on"
+            - alias: "Continue if EV Solar charger button is toggled on"
               condition: template
               value_template: >
-                {% if has_value(e_startCharger) %}
-                  {{ is_state(e_startCharger, 'on') }}
+                {% if has_value(e_EVSolarCharger) %}
+                  {{ is_state(e_EVSolarCharger, 'on') }}
                 {% else %}
                   {{ true }}
                 {% endif %}
@@ -448,6 +447,13 @@ actions:
                     entity_id: "{{ e_carChargerSwitch }}"
                 - delay: "{{ wait_charger_on }}"
 
+            - alias: "Notify devices EV Solar Charger has started" 
+              action: notify.all_devices
+              metadata: {}
+              data:
+                message: Started
+                title: EV Solar Charger
+                
             # Always set initial charge current here after turning on charger.
             # Tesla API will only set new charge current if the old and new values are different. Confirmed in log.
             # If using OCPP API. See https://github.com/lbbrhzn/ocpp/blob/main/docs/Charge_automation.md
@@ -475,13 +481,6 @@ actions:
             # Others: wait_charging_status_update=0, wait_force_update=5
             - alias: "Wait charging status update" 
               delay: "{{ wait_charging_status_update }}"
-
-            - alias: "Notify devices EV Solar Charger has started" 
-              action: notify.all_devices
-              metadata: {}
-              data:
-                message: Started
-                title: EV Solar Charger
                 
         #####################################
         # Calculate new charging current
@@ -490,7 +489,14 @@ actions:
             # Minimum charge current
             chargerMinCurrent: >
               {% if has_value(e_carChargerMinCurrent) %}
-                {{ states(e_carChargerMinCurrent) | int }}
+                {% set minCurrent = states(e_carChargerMinCurrent) | int %}
+                {% if minCurrent < 0 %}
+                  {{ 0 }}
+                {% elif minCurrent > carChargerMaxCurrent %}
+                  {{ carChargerMaxCurrent }}
+                {% else %}
+                  {{ minCurrent }}
+                {% endif %}
               {% else %}
                 {{ 0 }}
               {% endif %}
@@ -549,7 +555,7 @@ actions:
                   value_template: "{{ not states(e_isCarCharging) | lower in rc_charger_charging }}"
                 - alias: "Exit script if EV Solar Charger is toggled off"
                   condition: template
-                  value_template: "{{ is_state(e_startCharger, 'off') }}"
+                  value_template: "{{ is_state(e_EVSolarCharger, 'off') }}"
                   
             sequence:
               - alias: "Turn off charger just in case if charging status issue"
@@ -563,12 +569,12 @@ actions:
               - alias: "Turn off EV Solar Charger toggle"
                 if:
                   - condition: template
-                    value_template: "{{ is_state(e_startCharger, 'on') }}"
+                    value_template: "{{ is_state(e_EVSolarCharger, 'on') }}"
                 then:
                  - action: input_boolean.turn_off
                    data: {}
                    target:
-                     entity_id: "{{ e_startCharger }}"
+                     entity_id: "{{ e_EVSolarCharger }}"
          
               - action: number.set_value
                 data_template:
@@ -661,17 +667,24 @@ actions:
         target:
           entity_id: "{{ e_carChargerSwitch }}"
       - delay: "{{ wait_charger_off }}"
+
+      - alias: "Notify all devices EV Solar Charger has finished"
+        action: notify.all_devices
+        metadata: {}
+        data:
+          message: Finished
+          title: EV Solar Charger
       
   # Turn off EV Solar Charger toggle
   - alias: "Turn off EV Solar Charger toggle"
     if:
       - condition: template
-        value_template: "{{ is_state(e_startCharger, 'on') }}"
+        value_template: "{{ is_state(e_EVSolarCharger, 'on') }}"
     then:
      - action: input_boolean.turn_off
        data: {}
        target:
-         entity_id: "{{ e_startCharger }}"
+         entity_id: "{{ e_EVSolarCharger }}"
        
   # For Tesla custom API, do not send command to turn off charger here if charger is already disconnected because it will trigger charger connect and disconnect events causing another run.
   # Get the latest data from Tesla to update HA before exiting script.
@@ -684,13 +697,6 @@ actions:
         target:
           entity_id: "{{ e_evCarForceUpdateAllHa }}"
       - delay: "{{ wait_force_update_all }}"
-
-  - alias: "Notify all devices EV Solar Charger has finished"
-    action: notify.all_devices
-    metadata: {}
-    data:
-      message: Finished
-      title: EV Solar Charger
 
 ###############################################################################
 # Only one Blueprint can run at any one time
